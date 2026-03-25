@@ -269,7 +269,10 @@ def get_available_actions() -> list[InvestigationAction]:
             func=execute_aws_operation,
             source="aws_sdk",
             requires=["service", "operation"],
-            availability_check=lambda sources: bool(sources.get("aws_metadata")),
+            # Keep the generic AWS SDK action out of automatic planning until
+            # we have a safe way to derive service/operation inputs from alert
+            # context. Otherwise the planner can select an action it cannot run.
+            availability_check=lambda _sources: False,
             parameter_extractor=None,
         ),
         # Knowledge action

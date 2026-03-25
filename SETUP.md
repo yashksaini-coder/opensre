@@ -94,6 +94,14 @@ make install
    OPENAI_API_KEY=your-openai-api-key
    ```
 
+At this stage, only one LLM API key is mandatory. Everything else depends on which path you want to test:
+
+- Required for any RCA run: `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`
+- Required only for the `Tracer Web App path`: `JWT_TOKEN`
+- Optional per system: `DD_*`, `GRAFANA_*`, `AWS_*`
+- Optional only for Slack delivery: `SLACK_WEBHOOK_URL`
+- Optional only for LangGraph deploy: `LANGSMITH_API_KEY`
+
 ### Choose an integration source
 
 You can run `Flow B` in two supported ways:
@@ -131,6 +139,12 @@ Use this path if you already configured integrations in Tracer.
 
 Use this path if you want to test or build integrations without depending on the Tracer web app.
 
+For a first real-system run, you do not need every integration:
+
+- `Datadog` or `Grafana` is enough to prove the RCA path against a real observability source
+- Add `AWS` only if you want AWS evidence
+- Add `SLACK_WEBHOOK_URL` only if you want the final report posted to Slack
+
 You can use `.env.example` as a reference for any other optional integrations you want to enable.
 
 If you prefer a local credential store instead of `.env`, you can also save integrations with:
@@ -166,6 +180,8 @@ Use one preflight command to check the effective config from `~/.tracer/integrat
 ```bash
 make verify-integrations
 ```
+
+This full check exits non-zero while any listed service is still missing. If you are validating a smaller path such as `Datadog + Slack`, run the service-specific checks below instead.
 
 Once these checks pass, RCA runs will query your configured external systems and use that returned evidence in the report.
 

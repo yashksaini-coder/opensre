@@ -33,3 +33,18 @@ def test_get_available_actions_skips_eks_when_dependency_missing(monkeypatch) ->
 
     assert "query_datadog_logs" in action_names
     assert "list_eks_clusters" not in action_names
+
+
+def test_execute_aws_operation_is_not_auto_plannable() -> None:
+    actions = get_available_actions()
+    action_by_name = {action.name: action for action in actions}
+
+    execute_aws_operation = action_by_name["execute_aws_operation"]
+
+    assert execute_aws_operation.availability_check is not None
+    assert (
+        execute_aws_operation.availability_check(
+            {"aws_metadata": {"service": "rds", "resource_id": "payments-prod"}}
+        )
+        is False
+    )
