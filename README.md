@@ -26,7 +26,7 @@
 </p>
 
 <p>
-  <a href="https://join.slack.com/t/tracer-cloud/shared_invite/zt-2xj0w3i3p-~EH0GFbZodFCXWkR7j3~w">
+  <a href="https://join.slack.com/share/enQtMTA4NTIyNjEwOTczNDgtODMzN2QyMGZhMjljZDJhMzAwNDg1YTc4ZTA0MjBkY2U5YTFhNTJjZmIyM2ViNGY1Y2I5MGMyMDRmOGFhMjM2Nw">
     <img src="https://img.shields.io/badge/➜_Click_To_Join_Our_Slack-white?style=for-the-badge&logo=slack&logoColor=4A154B" alt="Join Slack">
   </a>
 </p>
@@ -153,7 +153,7 @@ Tracer integrates with the systems that power modern cloud platforms.
 Tracer is community-built. Every integration, improvement, and bug fix makes it better for thousands of engineers. We actively review PRs and welcome contributors of all experience levels.
 
 <p>
-  <a href="https://join.slack.com/t/tracer-cloud/shared_invite/zt-3ifakcs2e-igoUEH8ygMlfxgJGLxsqeA">
+  <a href="https://join.slack.com/share/enQtMTA4NTIyNjEwOTczNDgtODMzN2QyMGZhMjljZDJhMzAwNDg1YTc4ZTA0MjBkY2U5YTFhNTJjZmIyM2ViNGY1Y2I5MGMyMDRmOGFhMjM2Nw">
     <img src="https://img.shields.io/badge/Join%20our%20Community%20Slack-4A154B?style=for-the-badge&logo=slack&logoColor=white" alt="Join our Community Slack" />
   </a>
 </p>
