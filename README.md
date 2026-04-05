@@ -122,6 +122,19 @@ When an alert fires, Tracer automatically:
 
 ---
 
+## Benchmark
+
+Generate the benchmark report:
+
+```shell
+make benchmark
+```
+
+Output:
+- docs/benchmarks/results.md
+
+---
+
 ## Capabilities
 
 |                                          |                                                           |
