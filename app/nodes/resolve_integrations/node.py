@@ -237,7 +237,7 @@ def _classify_integrations(
             except Exception:
                 continue
 
-            if atlas_config.api_public_key and atlas_config.api_private_key:
+            if atlas_config.api_public_key and atlas_config.api_private_key and atlas_config.project_id:
                 resolved["mongodb_atlas"] = {
                     "api_public_key": atlas_config.api_public_key,
                     "api_private_key": atlas_config.api_private_key,
@@ -503,11 +503,12 @@ def _load_env_integrations() -> list[dict[str, Any]]:
 
     atlas_pub = os.getenv("MONGODB_ATLAS_PUBLIC_KEY", "").strip()
     atlas_priv = os.getenv("MONGODB_ATLAS_PRIVATE_KEY", "").strip()
-    if atlas_pub and atlas_priv:
+    atlas_project = os.getenv("MONGODB_ATLAS_PROJECT_ID", "").strip()
+    if atlas_pub and atlas_priv and atlas_project:
         atlas_config = build_mongodb_atlas_config({
             "api_public_key": atlas_pub,
             "api_private_key": atlas_priv,
-            "project_id": os.getenv("MONGODB_ATLAS_PROJECT_ID", "").strip(),
+            "project_id": atlas_project,
             "base_url": os.getenv("MONGODB_ATLAS_BASE_URL", "https://cloud.mongodb.com/api/atlas/v2").strip(),
         })
         integrations.append({
