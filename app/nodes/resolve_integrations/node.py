@@ -676,20 +676,23 @@ def _load_env_integrations() -> list[dict[str, Any]]:
     mariadb_host = os.getenv("MARIADB_HOST", "").strip()
     mariadb_database = os.getenv("MARIADB_DATABASE", "").strip()
     if mariadb_host and mariadb_database:
-        mariadb_config = build_mariadb_config({
-            "host": mariadb_host,
-            "port": os.getenv("MARIADB_PORT", "3306").strip(),
-            "database": mariadb_database,
-            "username": os.getenv("MARIADB_USERNAME", "").strip(),
-            "password": os.getenv("MARIADB_PASSWORD", "").strip(),
-            "ssl": os.getenv("MARIADB_SSL", "true").strip().lower() in ("true", "1", "yes"),
-        })
-        integrations.append({
-            "id": "env-mariadb",
-            "service": "mariadb",
-            "status": "active",
-            "credentials": mariadb_config.model_dump(exclude={"integration_id"}),
-        })
+        try:
+            mariadb_config = build_mariadb_config({
+                "host": mariadb_host,
+                "port": os.getenv("MARIADB_PORT", "3306").strip(),
+                "database": mariadb_database,
+                "username": os.getenv("MARIADB_USERNAME", "").strip(),
+                "password": os.getenv("MARIADB_PASSWORD", "").strip(),
+                "ssl": os.getenv("MARIADB_SSL", "true").strip().lower() in ("true", "1", "yes"),
+            })
+            integrations.append({
+                "id": "env-mariadb",
+                "service": "mariadb",
+                "status": "active",
+                "credentials": mariadb_config.model_dump(exclude={"integration_id"}),
+            })
+        except Exception:
+            logger.debug("Failed to load MariaDB config from env", exc_info=True)
 
     return integrations
 

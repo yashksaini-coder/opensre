@@ -50,7 +50,7 @@ class TestMariaDBConfig:
         config = MariaDBConfig(host="localhost", database="testdb")
         assert config.port == 3306
         assert config.ssl is True
-        assert config.timeout_seconds == 10
+        assert config.timeout_seconds == 5
         assert config.max_results == 50
         assert config.username == ""
         assert config.password == ""
@@ -556,7 +556,7 @@ class TestGetReplicationStatus:
             nonlocal execute_call_count
             execute_call_count += 1
             if "ALL SLAVES" in stmt:
-                raise pymysql.err.OperationalError(1064, "syntax error")
+                raise pymysql.err.ProgrammingError(1064, "syntax error")
 
         mock_cursor.execute.side_effect = execute_side_effect
         mock_cursor.fetchall.return_value = [row]

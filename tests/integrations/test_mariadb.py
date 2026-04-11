@@ -28,7 +28,7 @@ class TestMariaDBConfig:
         assert config.username == ""
         assert config.password == ""
         assert config.ssl is True
-        assert config.timeout_seconds == 10
+        assert config.timeout_seconds == 5
         assert config.max_results == 50
         assert config.is_configured is False
 

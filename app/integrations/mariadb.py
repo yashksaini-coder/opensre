@@ -33,7 +33,7 @@ class MariaDBConfig(StrictConfigModel):
     username: str = ""
     password: str = ""
     ssl: bool = True
-    timeout_seconds: int = Field(default=10, gt=0)
+    timeout_seconds: int = Field(default=DEFAULT_MARIADB_TIMEOUT_S, gt=0)
     max_results: int = Field(default=DEFAULT_MARIADB_MAX_RESULTS, gt=0, le=200)
     integration_id: str = ""
 
@@ -102,11 +102,13 @@ def mariadb_config_from_env() -> MariaDBConfig | None:
 
 def _get_connection(config: MariaDBConfig) -> Any:
     """Create a pymysql connection from config. Caller must close."""
+    import ssl as _ssl
+
     import pymysql
 
-    ssl_arg: dict[str, Any] | None = None
+    ssl_ctx: Any = None
     if config.ssl:
-        ssl_arg = {"ssl_verify_cert": True}
+        ssl_ctx = _ssl.create_default_context()
 
     connect_timeout = max(1, int(config.timeout_seconds))
 
@@ -116,7 +118,7 @@ def _get_connection(config: MariaDBConfig) -> Any:
         database=config.database,
         user=config.username,
         password=config.password,
-        ssl=ssl_arg,
+        ssl=ssl_ctx,
         connect_timeout=connect_timeout,
         read_timeout=int(config.timeout_seconds),
         write_timeout=int(config.timeout_seconds),
@@ -344,8 +346,8 @@ def get_slow_queries(
                 cur.execute(
                     """
                     SELECT DIGEST_TEXT, COUNT_STAR,
-                           ROUND(AVG_TIMER_WAIT / 1000000000000, 4) AS avg_time_ms,
-                           ROUND(SUM_TIMER_WAIT / 1000000000000, 4) AS total_time_ms,
+                           ROUND(AVG_TIMER_WAIT / 1000000000, 4) AS avg_time_ms,
+                           ROUND(SUM_TIMER_WAIT / 1000000000, 4) AS total_time_ms,
                            SUM_ROWS_EXAMINED, SUM_ROWS_SENT
                     FROM performance_schema.events_statements_summary_by_digest
                     WHERE SCHEMA_NAME = %s
@@ -403,8 +405,12 @@ def get_replication_status(config: MariaDBConfig) -> dict[str, Any]:
                         if cur.description:
                             columns = [d[0] for d in cur.description]
                         break
-                    except Exception:  # noqa: BLE001
-                        continue
+                    except Exception as stmt_err:  # noqa: BLE001
+                        import pymysql as _pymysql
+
+                        if isinstance(stmt_err, _pymysql.err.ProgrammingError):
+                            continue
+                        raise
 
                 if not rows:
                     return {
