@@ -16,6 +16,7 @@ from langsmith import traceable
 
 from app.integrations.github_mcp import build_github_mcp_config
 from app.integrations.gitlab import DEFAULT_GITLAB_BASE_URL, build_gitlab_config
+from app.integrations.mariadb import build_mariadb_config
 from app.integrations.models import (
     AWSIntegrationConfig,
     CoralogixIntegrationConfig,
@@ -59,6 +60,7 @@ _SERVICE_KEY_MAP = {
     "postgres": "postgresql",
     "mongodb_atlas": "mongodb_atlas",
     "atlas": "mongodb_atlas",
+    "mariadb": "mariadb",
     "vercel": "vercel",
     "opsgenie": "opsgenie",
 }
@@ -288,6 +290,30 @@ def _classify_integrations(
                     "api_private_key": atlas_config.api_private_key,
                     "project_id": atlas_config.project_id,
                     "base_url": atlas_config.base_url,
+                    "integration_id": integration.get("id", ""),
+                }
+
+        elif key == "mariadb":
+            try:
+                mariadb_config = build_mariadb_config({
+                    "host": credentials.get("host", ""),
+                    "port": credentials.get("port", 3306),
+                    "database": credentials.get("database", ""),
+                    "username": credentials.get("username", ""),
+                    "password": credentials.get("password", ""),
+                    "ssl": credentials.get("ssl", True),
+                })
+            except Exception:
+                continue
+
+            if mariadb_config.host and mariadb_config.database:
+                resolved["mariadb"] = {
+                    "host": mariadb_config.host,
+                    "port": mariadb_config.port,
+                    "database": mariadb_config.database,
+                    "username": mariadb_config.username,
+                    "password": mariadb_config.password,
+                    "ssl": mariadb_config.ssl,
                     "integration_id": integration.get("id", ""),
                 }
 
@@ -646,6 +672,24 @@ def _load_env_integrations() -> list[dict[str, Any]]:
                 "credentials": atlas_config.model_dump(exclude={"integration_id"}),
             }
         )
+
+    mariadb_host = os.getenv("MARIADB_HOST", "").strip()
+    mariadb_database = os.getenv("MARIADB_DATABASE", "").strip()
+    if mariadb_host and mariadb_database:
+        mariadb_config = build_mariadb_config({
+            "host": mariadb_host,
+            "port": os.getenv("MARIADB_PORT", "3306").strip(),
+            "database": mariadb_database,
+            "username": os.getenv("MARIADB_USERNAME", "").strip(),
+            "password": os.getenv("MARIADB_PASSWORD", "").strip(),
+            "ssl": os.getenv("MARIADB_SSL", "true").strip().lower() in ("true", "1", "yes"),
+        })
+        integrations.append({
+            "id": "env-mariadb",
+            "service": "mariadb",
+            "status": "active",
+            "credentials": mariadb_config.model_dump(exclude={"integration_id"}),
+        })
 
     return integrations
 

@@ -227,6 +227,22 @@ class PostgreSQLIntegrationConfig(StrictConfigModel):
         normalized = str(value or "prefer").strip()
         return normalized or "prefer"
 
+class MariaDBIntegrationConfig(StrictConfigModel):
+    """Normalized MariaDB credentials used by resolution and verification flows."""
+
+    host: str
+    port: int = 3306
+    database: str
+    username: str
+    password: str = ""
+    ssl: bool = True
+    integration_id: str = ""
+
+    @field_validator("host", "database", "username", mode="before")
+    @classmethod
+    def _normalize_str(cls, value: object) -> str:
+        return str(value or "").strip()
+
 
 class MongoDBAtlasIntegrationConfig(StrictConfigModel):
     """Normalized MongoDB Atlas API credentials used by resolution and verification flows."""
@@ -351,6 +367,7 @@ class EffectiveIntegrations(StrictConfigModel):
     sentry: EffectiveIntegrationEntry | None = None
     mongodb: EffectiveIntegrationEntry | None = None
     mongodb_atlas: EffectiveIntegrationEntry | None = None
+    mariadb: EffectiveIntegrationEntry | None = None
     google_docs: EffectiveIntegrationEntry | None = None
     gitlab: EffectiveIntegrationEntry | None = None
     vercel: EffectiveIntegrationEntry | None = None

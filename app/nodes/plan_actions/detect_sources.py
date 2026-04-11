@@ -858,6 +858,18 @@ def detect_sources(
             "connection_verified": True,
         }
 
+    mariadb_int = (resolved_integrations or {}).get("mariadb")
+    if mariadb_int and str(mariadb_int.get("host", "")).strip() and str(mariadb_int.get("database", "")).strip():
+        sources["mariadb"] = {
+            "host": str(mariadb_int.get("host", "")).strip(),
+            "port": mariadb_int.get("port", 3306),
+            "database": str(mariadb_int.get("database", "")).strip(),
+            "username": str(mariadb_int.get("username", "")).strip(),
+            "password": str(mariadb_int.get("password", "")).strip(),
+            "ssl": mariadb_int.get("ssl", True),
+            "connection_verified": True,
+        }
+
     opsgenie_int = (resolved_integrations or {}).get("opsgenie")
     if opsgenie_int and str(opsgenie_int.get("api_key", "")).strip():
         alert_id = str(

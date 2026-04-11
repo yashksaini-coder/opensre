@@ -12,6 +12,7 @@ import requests
 from app.auth.jwt_auth import extract_org_id_from_jwt
 from app.config import get_tracer_base_url
 from app.integrations.github_mcp import build_github_mcp_config, validate_github_mcp_config
+from app.integrations.mariadb import build_mariadb_config, validate_mariadb_config
 from app.integrations.models import (
     AWSIntegrationConfig,
     CoralogixIntegrationConfig,
@@ -53,6 +54,7 @@ SUPPORTED_VERIFY_SERVICES = (
     "mongodb",
     "postgresql",
     "mongodb_atlas",
+    "mariadb",
     "google_docs",
     "vercel",
     "opsgenie",
@@ -278,6 +280,35 @@ def resolve_effective_integrations() -> dict[str, dict[str, Any]]:
                     "base_url": os.getenv(
                         "MONGODB_ATLAS_BASE_URL", "https://cloud.mongodb.com/api/atlas/v2"
                     ).strip(),
+                },
+            }
+
+    mariadb_integration = classified_integrations.get("mariadb")
+    if isinstance(mariadb_integration, dict):
+        effective["mariadb"] = {
+            "source": source_by_service.get("mariadb", "local env"),
+            "config": {
+                "host": str(mariadb_integration.get("host", "")).strip(),
+                "port": mariadb_integration.get("port", 3306),
+                "database": str(mariadb_integration.get("database", "")).strip(),
+                "username": str(mariadb_integration.get("username", "")).strip(),
+                "password": str(mariadb_integration.get("password", "")).strip(),
+                "ssl": mariadb_integration.get("ssl", True),
+            },
+        }
+    else:
+        mariadb_host = os.getenv("MARIADB_HOST", "").strip()
+        mariadb_database = os.getenv("MARIADB_DATABASE", "").strip()
+        if mariadb_host and mariadb_database:
+            effective["mariadb"] = {
+                "source": "local env",
+                "config": {
+                    "host": mariadb_host,
+                    "port": int(os.getenv("MARIADB_PORT", "3306").strip() or "3306"),
+                    "database": mariadb_database,
+                    "username": os.getenv("MARIADB_USERNAME", "").strip(),
+                    "password": os.getenv("MARIADB_PASSWORD", "").strip(),
+                    "ssl": os.getenv("MARIADB_SSL", "true").strip().lower() in ("true", "1", "yes"),
                 },
             }
 
@@ -736,6 +767,17 @@ def _verify_mongodb_atlas(source: str, config: dict[str, Any]) -> dict[str, str]
     )
 
 
+def _verify_mariadb(source: str, config: dict[str, Any]) -> dict[str, str]:
+    mariadb_config = build_mariadb_config(config)
+    result = validate_mariadb_config(mariadb_config)
+    return _result(
+        "mariadb",
+        source,
+        "passed" if result.ok else "failed",
+        result.detail,
+    )
+
+
 def _verify_google_docs(source: str, config: dict[str, Any]) -> dict[str, str]:
     """Validate Google Docs credentials and folder access."""
     from app.services.google_docs import GoogleDocsClient
@@ -931,6 +973,8 @@ def verify_integrations(
             results.append(_verify_postgresql(source, config))
         elif current_service == "mongodb_atlas":
             results.append(_verify_mongodb_atlas(source, config))
+        elif current_service == "mariadb":
+            results.append(_verify_mariadb(source, config))
         elif current_service == "google_docs":
             results.append(_verify_google_docs(source, config))
         elif current_service == "vercel":
