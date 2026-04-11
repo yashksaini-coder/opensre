@@ -88,14 +88,16 @@ def mariadb_config_from_env() -> MariaDBConfig | None:
     host = os.getenv("MARIADB_HOST", "").strip()
     if not host:
         return None
-    return build_mariadb_config({
-        "host": host,
-        "port": os.getenv("MARIADB_PORT", str(DEFAULT_MARIADB_PORT)).strip(),
-        "database": os.getenv("MARIADB_DATABASE", "").strip(),
-        "username": os.getenv("MARIADB_USERNAME", "").strip(),
-        "password": os.getenv("MARIADB_PASSWORD", "").strip(),
-        "ssl": os.getenv("MARIADB_SSL", "true").strip().lower() in ("true", "1", "yes"),
-    })
+    return build_mariadb_config(
+        {
+            "host": host,
+            "port": os.getenv("MARIADB_PORT", str(DEFAULT_MARIADB_PORT)).strip(),
+            "database": os.getenv("MARIADB_DATABASE", "").strip(),
+            "username": os.getenv("MARIADB_USERNAME", "").strip(),
+            "password": os.getenv("MARIADB_PASSWORD", "").strip(),
+            "ssl": os.getenv("MARIADB_SSL", "true").strip().lower() in ("true", "1", "yes"),
+        }
+    )
 
 
 def _get_connection(config: MariaDBConfig) -> Any:
@@ -127,9 +129,7 @@ def _get_connection(config: MariaDBConfig) -> Any:
 def validate_mariadb_config(config: MariaDBConfig) -> MariaDBValidationResult:
     """Validate MariaDB connectivity with a lightweight version query."""
     if not config.host or not config.database:
-        return MariaDBValidationResult(
-            ok=False, detail="MariaDB host and database are required."
-        )
+        return MariaDBValidationResult(ok=False, detail="MariaDB host and database are required.")
 
     try:
         conn = _get_connection(config)
@@ -205,16 +205,18 @@ def get_process_list(
                 )
                 processes = []
                 for row in cur.fetchall():
-                    processes.append({
-                        "id": row[0],
-                        "user": row[1],
-                        "host": row[2],
-                        "database": row[3] or "",
-                        "command": row[4],
-                        "time_secs": row[5] or 0,
-                        "state": row[6] or "",
-                        "query": _truncate(row[7] or ""),
-                    })
+                    processes.append(
+                        {
+                            "id": row[0],
+                            "user": row[1],
+                            "host": row[2],
+                            "database": row[3] or "",
+                            "command": row[4],
+                            "time_secs": row[5] or 0,
+                            "state": row[6] or "",
+                            "query": _truncate(row[7] or ""),
+                        }
+                    )
                 return {
                     "source": "mariadb",
                     "available": True,
@@ -237,17 +239,28 @@ def get_global_status(config: MariaDBConfig) -> dict[str, Any]:
     if not config.is_configured:
         return {"source": "mariadb", "available": False, "error": "Not configured."}
 
-    _IMPORTANT_KEYS = frozenset({
-        "Threads_connected", "Threads_running", "Threads_created",
-        "Connections", "Max_used_connections",
-        "Slow_queries", "Questions", "Queries",
-        "Aborted_clients", "Aborted_connects",
-        "Bytes_received", "Bytes_sent",
-        "Innodb_buffer_pool_reads", "Innodb_buffer_pool_read_requests",
-        "Innodb_row_lock_waits", "Innodb_row_lock_time",
-        "Innodb_deadlocks",
-        "Uptime",
-    })
+    _IMPORTANT_KEYS = frozenset(
+        {
+            "Threads_connected",
+            "Threads_running",
+            "Threads_created",
+            "Connections",
+            "Max_used_connections",
+            "Slow_queries",
+            "Questions",
+            "Queries",
+            "Aborted_clients",
+            "Aborted_connects",
+            "Bytes_received",
+            "Bytes_sent",
+            "Innodb_buffer_pool_reads",
+            "Innodb_buffer_pool_read_requests",
+            "Innodb_row_lock_waits",
+            "Innodb_row_lock_time",
+            "Innodb_deadlocks",
+            "Uptime",
+        }
+    )
 
     try:
         conn = _get_connection(config)
@@ -344,14 +357,16 @@ def get_slow_queries(
                 )
                 queries = []
                 for row in cur.fetchall():
-                    queries.append({
-                        "digest_text": _truncate(row[0] or ""),
-                        "count": row[1] or 0,
-                        "avg_time_ms": float(row[2]) if row[2] is not None else 0,
-                        "total_time_ms": float(row[3]) if row[3] is not None else 0,
-                        "rows_examined": row[4] or 0,
-                        "rows_sent": row[5] or 0,
-                    })
+                    queries.append(
+                        {
+                            "digest_text": _truncate(row[0] or ""),
+                            "count": row[1] or 0,
+                            "avg_time_ms": float(row[2]) if row[2] is not None else 0,
+                            "total_time_ms": float(row[3]) if row[3] is not None else 0,
+                            "rows_examined": row[4] or 0,
+                            "rows_sent": row[5] or 0,
+                        }
+                    )
                 return {
                     "source": "mariadb",
                     "available": True,
@@ -405,8 +420,10 @@ def get_replication_status(config: MariaDBConfig) -> dict[str, Any]:
                     "Slave_IO_Running",
                     "Slave_SQL_Running",
                     "Seconds_Behind_Master",
-                    "Last_Error", "Last_Errno",
-                    "Master_Host", "Master_Port",
+                    "Last_Error",
+                    "Last_Errno",
+                    "Master_Host",
+                    "Master_Port",
                     "Master_Log_File",
                     "Relay_Log_Space",
                     "Exec_Master_Log_Pos",
