@@ -20,28 +20,6 @@ from app.cli.exit_codes import ERROR, SUCCESS
 from app.version import get_version
 
 
-def _build_investigate_argv(
-    *,
-    input_path: str | None,
-    input_json: str | None,
-    interactive: bool,
-    print_template: str | None,
-    output: str | None,
-) -> list[str]:
-    argv: list[str] = []
-    if input_path is not None:
-        argv.extend(["--input", input_path])
-    if input_json is not None:
-        argv.extend(["--input-json", input_json])
-    if interactive:
-        argv.append("--interactive")
-    if print_template is not None:
-        argv.extend(["--print-template", print_template])
-    if output is not None:
-        argv.extend(["--output", output])
-    return argv
-
-
 @click.command(name="update")
 @click.option(
     "--check",
@@ -151,7 +129,10 @@ def investigate_command(
     output: str | None,
 ) -> None:
     """Run an RCA investigation against an alert payload."""
-    from app.main import main as investigate_main
+    from app.cli import write_json
+    from app.cli.alert_templates import build_alert_template
+    from app.cli.investigate import run_investigation_cli_streaming
+    from app.cli.payload import load_payload
 
     capture_investigation_started(
         input_path=input_path,
@@ -159,21 +140,23 @@ def investigate_command(
         interactive=interactive,
     )
     try:
-        exit_code = investigate_main(
-            _build_investigate_argv(
-                input_path=input_path,
-                input_json=input_json,
-                interactive=interactive,
-                print_template=print_template,
-                output=output,
-            )
+        if print_template:
+            write_json(build_alert_template(print_template), output)
+            capture_investigation_completed()
+            raise SystemExit(SUCCESS)
+
+        payload = load_payload(
+            input_path=input_path,
+            input_json=input_json,
+            interactive=interactive,
         )
+        result = run_investigation_cli_streaming(raw_alert=payload)
+        write_json(result, output)
+    except SystemExit:
+        raise
     except Exception:
         capture_investigation_failed()
         raise
 
-    if exit_code == SUCCESS:
-        capture_investigation_completed()
-    else:
-        capture_investigation_failed()
-    raise SystemExit(exit_code)
+    capture_investigation_completed()
+    raise SystemExit(SUCCESS)
