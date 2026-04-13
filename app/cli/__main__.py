@@ -52,6 +52,12 @@ def cli(
 
     if ctx.invoked_subcommand is None:
         capture_cli_invoked()
+        import sys
+
+        if sys.stdin.isatty() and sys.stdout.isatty():
+            from app.cli.repl import run_repl
+
+            raise SystemExit(run_repl())
         render_landing()
         raise SystemExit(0)
 
