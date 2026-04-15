@@ -85,8 +85,11 @@ def classify_input(text: str, session: ReplSession) -> InputKind:
     Rules (in order):
       1. Anything starting with ``/`` is a slash command.
       2. If there is no previous investigation, treat as a new alert.
-      3. If the input has alert-shaped signals, treat as a new alert.
-      4. If the input is a short question, treat as a follow-up.
+      3. If the input is a short question, treat as a follow-up — even if it
+         mentions metric names like "CPU" or "memory".  The shape of the
+         sentence ("why did CPU spike?") is a stronger signal than the
+         presence of a single alert-ish word.
+      4. If the input has alert-shaped signals, treat as a new alert.
       5. Otherwise default to a new alert (safer — produces a fresh run rather
          than a free-floating chat message).
     """
@@ -103,10 +106,10 @@ def classify_input(text: str, session: ReplSession) -> InputKind:
     if session.last_state is None:
         return "new_alert"
 
-    if _mentions_alert_signal(stripped):
-        return "new_alert"
-
     if _is_short_question(stripped):
         return "follow_up"
+
+    if _mentions_alert_signal(stripped):
+        return "new_alert"
 
     return "new_alert"

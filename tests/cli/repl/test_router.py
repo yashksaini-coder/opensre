@@ -40,6 +40,16 @@ class TestClassifyInput:
         assert classify_input("CPU spiked on orders-api", session) == "new_alert"
         assert classify_input("5xx errors from checkout service", session) == "new_alert"
 
+    def test_short_question_with_alert_keyword_is_follow_up(self) -> None:
+        # Short question-shape wins over the presence of an alert keyword —
+        # "why did CPU spike?" should answer from last_state, not kick off a
+        # fresh investigation.
+        session = ReplSession()
+        session.last_state = {"root_cause": "disk full"}
+        assert classify_input("why did CPU spike?", session) == "follow_up"
+        assert classify_input("what caused the memory error?", session) == "follow_up"
+        assert classify_input("how did the connection drop?", session) == "follow_up"
+
     def test_long_non_question_defaults_to_new_alert(self) -> None:
         session = ReplSession()
         session.last_state = {"root_cause": "disk full"}
