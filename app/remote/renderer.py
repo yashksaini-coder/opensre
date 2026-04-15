@@ -45,13 +45,14 @@ class StreamRenderer:
     in real time with tool calls, LLM reasoning, and other decisions.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, *, local: bool = False) -> None:
         self._tracker = ProgressTracker()
         self._active_node: str | None = None
         self._events_received: int = 0
         self._node_names_seen: list[str] = []
         self._final_state: dict[str, Any] = {}
         self._stream_completed = False
+        self._local = local
 
     @property
     def events_received(self) -> int:
@@ -74,7 +75,8 @@ class StreamRenderer:
 
         Returns the accumulated final state dict.
         """
-        _print_connection_banner()
+        if not self._local:
+            _print_connection_banner()
 
         try:
             for event in events:

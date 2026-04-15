@@ -163,7 +163,7 @@ def run_investigation_cli_streaming(
         pipeline_name=pipeline_name,
         severity=severity,
     )
-    renderer = StreamRenderer()
+    renderer = StreamRenderer(local=True)
     final_state = renderer.render_stream(events)
     return {
         "report": final_state.get("slack_message", final_state.get("report", "")),
@@ -259,12 +259,14 @@ def run_investigation_for_session(
             _cancel_pump()
             raise
 
-    renderer = StreamRenderer()
+    renderer = StreamRenderer(local=True)
     try:
         final_state = renderer.render_stream(_events())
     except KeyboardInterrupt:
         _cancel_pump()
-        thread.join(timeout=5)
         raise
-    thread.join()
+    finally:
+        # Always join so unexpected exceptions from render_stream don't leak
+        # the daemon thread and leave an orphaned LLM call running.
+        thread.join(timeout=5)
     return dict(final_state)
