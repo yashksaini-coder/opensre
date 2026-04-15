@@ -3,11 +3,40 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any
 
 from rich.console import Console
 
 from app.cli.repl.session import ReplSession
+
+_logger = logging.getLogger(__name__)
+
+
+def _summarize_evidence(evidence: Any) -> list[str]:
+    """Render a short evidence preview for the follow-up prompt.
+
+    ``AgentState.evidence`` is a ``dict[str, Any]`` keyed by evidence id, but
+    we accept list/other shapes defensively so an unexpected value doesn't
+    silently drop all grounding context.
+    """
+    if isinstance(evidence, dict):
+        sample_keys = list(evidence)[:3]
+        sample = {key: evidence[key] for key in sample_keys}
+        return [
+            f"Evidence items: {len(evidence)}",
+            "Evidence keys: " + ", ".join(map(str, sample_keys)),
+            "Sample evidence:\n" + json.dumps(sample, indent=2, default=str)[:1500],
+        ]
+    if isinstance(evidence, list):
+        return [
+            f"Evidence items: {len(evidence)}",
+            "Sample evidence:\n" + json.dumps(evidence[:3], indent=2, default=str)[:1500],
+        ]
+    return [
+        f"Evidence type: {type(evidence).__name__}",
+        f"Evidence summary:\n{str(evidence)[:1500]}",
+    ]
 
 
 def _summarize_last_state(state: dict[str, Any]) -> str:
@@ -25,14 +54,15 @@ def _summarize_last_state(state: dict[str, Any]) -> str:
     slack_message = state.get("slack_message") or ""
     if slack_message:
         parts.append(f"Report:\n{slack_message[:2000]}")
-    evidence = state.get("evidence") or []
+    evidence = state.get("evidence")
     if evidence:
         try:
-            parts.append(f"Evidence items: {len(evidence)}")
-            sample = evidence[:3]
-            parts.append("Sample evidence:\n" + json.dumps(sample, indent=2, default=str)[:1500])
-        except Exception:  # noqa: BLE001
-            pass
+            parts.extend(_summarize_evidence(evidence))
+        except (TypeError, ValueError) as exc:
+            # Serialization can fail on exotic evidence values; tell the LLM
+            # the context was withheld rather than silently dropping it.
+            _logger.warning("could not serialize evidence for follow-up: %s", exc)
+            parts.append("(evidence present but could not be serialized for grounding)")
     return "\n\n".join(parts) or "(no prior investigation details available)"
 
 
