@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import Iterator
 from typing import TYPE_CHECKING, Any
 
@@ -13,6 +14,8 @@ from app.config import LLMSettings
 if TYPE_CHECKING:
     from app.remote.stream import StreamEvent
     from app.state import AgentState
+
+_logger = logging.getLogger(__name__)
 
 
 def _call_run_investigation(
@@ -269,4 +272,9 @@ def run_investigation_for_session(
         # Always join so unexpected exceptions from render_stream don't leak
         # the daemon thread and leave an orphaned LLM call running.
         thread.join(timeout=5)
+        if thread.is_alive():
+            _logger.warning(
+                "investigation thread did not terminate within 5s after cancellation; "
+                "an LLM call may still be in flight"
+            )
     return dict(final_state)
