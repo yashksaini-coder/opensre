@@ -10,6 +10,7 @@ Enable shell tab-completion (add to your shell profile for persistence):
 from __future__ import annotations
 
 import os
+import sys
 
 import click
 from dotenv import load_dotenv
@@ -52,8 +53,6 @@ def cli(
 
     if ctx.invoked_subcommand is None:
         capture_cli_invoked()
-        import sys
-
         if sys.stdin.isatty() and sys.stdout.isatty():
             from app.cli.repl import run_repl
 
