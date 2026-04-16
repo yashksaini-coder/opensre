@@ -156,6 +156,13 @@ class TestRabbitMQConfigFromEnv:
         monkeypatch.delenv("RABBITMQ_HOST", raising=False)
         assert rabbitmq_config_from_env() is None
 
+    def test_returns_none_when_username_missing(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("RABBITMQ_HOST", "rmq.internal")
+        monkeypatch.delenv("RABBITMQ_USERNAME", raising=False)
+        assert rabbitmq_config_from_env() is None
+
     def test_loads_all_env_vars(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("RABBITMQ_HOST", "rmq.internal")
         monkeypatch.setenv("RABBITMQ_MANAGEMENT_PORT", "15672")
@@ -489,3 +496,35 @@ class TestGetConnectionStats:
         assert result["available"] is True
         assert result["connections"][0]["name"] == "fast"
         assert result["connections"][1]["name"] == "slow"
+        # broker_total_connections = all connections; vhost_connections = after filter.
+        assert result["broker_total_connections"] == 2
+        assert result["vhost_connections"] == 2
+
+    def test_filters_by_vhost(self, patched_client: Any) -> None:
+        """Connections from other vhosts are excluded from results."""
+        patched_client(
+            {
+                "/api/connections": [
+                    {
+                        "name": "orders-conn",
+                        "user": "u",
+                        "vhost": "/orders",
+                        "recv_oct_details": {"rate": 100.0},
+                        "send_oct_details": {"rate": 50.0},
+                    },
+                    {
+                        "name": "billing-conn",
+                        "user": "u",
+                        "vhost": "/billing",
+                        "recv_oct_details": {"rate": 200.0},
+                        "send_oct_details": {"rate": 100.0},
+                    },
+                ]
+            }
+        )
+        config = RabbitMQConfig(host="rmq", username="admin", password="pw", vhost="/orders")
+        result = get_connection_stats(config)
+        assert result["available"] is True
+        assert result["broker_total_connections"] == 2
+        assert result["vhost_connections"] == 1
+        assert result["connections"][0]["name"] == "orders-conn"

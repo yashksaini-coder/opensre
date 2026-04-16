@@ -23,7 +23,8 @@ def test_run_happy_path() -> None:
     fake_result = {
         "source": "rabbitmq",
         "available": True,
-        "total_connections": 1,
+        "broker_total_connections": 3,
+        "vhost_connections": 1,
         "returned": 1,
         "connections": [
             {"name": "app-1", "user": "admin", "vhost": "/", "recv_rate_bytes_per_sec": 1024.0}
@@ -35,4 +36,4 @@ def test_run_happy_path() -> None:
     ):
         result = get_rabbitmq_connection_stats(host="rmq", username="admin")
     assert result["available"] is True
-    assert result["total_connections"] == 1
+    assert result["vhost_connections"] == 1
