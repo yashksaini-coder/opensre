@@ -16,6 +16,11 @@ from app.tools.tool_decorator import tool
     description="Return per-node RabbitMQ resource utilization: memory used vs. limit (with alarm flag), disk free vs. limit (with alarm flag), file descriptors, sockets, erlang process usage, and cluster partition state. Essential for diagnosing backpressure, partitions, or node crashes.",
     source="rabbitmq",
     surfaces=("investigation", "chat"),
+    use_cases=[
+        "Checking if a RabbitMQ node is under memory or disk pressure",
+        "Detecting cluster network partitions between nodes",
+        "Investigating file descriptor or socket exhaustion on a broker node",
+    ],
     is_available=rabbitmq_is_available,
     extract_params=rabbitmq_extract_params,
 )

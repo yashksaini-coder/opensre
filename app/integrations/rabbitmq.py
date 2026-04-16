@@ -63,7 +63,8 @@ class RabbitMQConfig(StrictConfigModel):
     @field_validator("password", mode="before")
     @classmethod
     def _normalize_password(cls, value: Any) -> str:
-        return str(value or "").strip()
+        # Do NOT strip passwords — leading/trailing whitespace is valid.
+        return str(value or "")
 
     @field_validator("vhost", mode="before")
     @classmethod
@@ -116,7 +117,7 @@ def rabbitmq_config_from_env() -> RabbitMQConfig | None:
                 str(DEFAULT_RABBITMQ_MANAGEMENT_PORT),
             ).strip(),
             "username": username,
-            "password": os.getenv("RABBITMQ_PASSWORD", "").strip(),
+            "password": os.getenv("RABBITMQ_PASSWORD", ""),
             "vhost": os.getenv("RABBITMQ_VHOST", DEFAULT_RABBITMQ_VHOST).strip(),
             "ssl": os.getenv("RABBITMQ_SSL", "false").strip().lower()
             in ("true", "1", "yes"),
@@ -363,12 +364,12 @@ def get_broker_overview(config: RabbitMQConfig) -> dict[str, Any]:
                     alarm_payload = {"ok": True, "detail": "ok"}
                 elif alarm_resp.status_code in (401, 403):
                     alarm_payload = {
-                        "ok": True,
-                        "detail": "alarm status unavailable (insufficient permissions)",
+                        "ok": None,
+                        "detail": "alarm status unknown (insufficient permissions)",
                     }
                 elif alarm_resp.status_code == 404:
                     alarm_payload = {
-                        "ok": True,
+                        "ok": None,
                         "detail": "alarm endpoint not available on this broker version",
                     }
                 else:

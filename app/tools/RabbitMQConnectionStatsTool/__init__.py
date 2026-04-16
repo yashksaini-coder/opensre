@@ -16,6 +16,11 @@ from app.tools.tool_decorator import tool
     description="List active RabbitMQ connections sorted by receive rate. Reports user, vhost, protocol, channel count, peer host/port, TLS status, and recv/send byte rates — helps spot connection exhaustion, slow consumers, or noisy publishers during an incident.",
     source="rabbitmq",
     surfaces=("investigation", "chat"),
+    use_cases=[
+        "Investigating connection exhaustion or connection storms",
+        "Identifying noisy publishers with high byte rates",
+        "Checking if slow consumers are holding open idle connections",
+    ],
     is_available=rabbitmq_is_available,
     extract_params=rabbitmq_extract_params,
 )

@@ -818,7 +818,7 @@ def load_env_integrations() -> list[dict[str, Any]]:
                         "RABBITMQ_MANAGEMENT_PORT", "15672"
                     ).strip(),
                     "username": rabbitmq_username,
-                    "password": os.getenv("RABBITMQ_PASSWORD", "").strip(),
+                    "password": os.getenv("RABBITMQ_PASSWORD", ""),
                     "vhost": os.getenv("RABBITMQ_VHOST", "/").strip(),
                     "ssl": os.getenv("RABBITMQ_SSL", "false").strip().lower()
                     in ("true", "1", "yes"),

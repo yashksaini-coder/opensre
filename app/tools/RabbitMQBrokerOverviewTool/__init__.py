@@ -16,6 +16,11 @@ from app.tools.tool_decorator import tool
     description="Return a cluster-wide RabbitMQ overview: version, cluster name, total message counts, publish/deliver rates, queue/consumer/connection/channel totals, plus the alarm health-check status (memory / disk / file-descriptor alarms).",
     source="rabbitmq",
     surfaces=("investigation", "chat"),
+    use_cases=[
+        "Getting a quick cluster-wide health snapshot during an incident",
+        "Checking if memory or disk alarms are active on the broker",
+        "Comparing publish vs deliver rates to detect throughput imbalances",
+    ],
     is_available=rabbitmq_is_available,
     extract_params=rabbitmq_extract_params,
 )
