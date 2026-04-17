@@ -164,6 +164,220 @@ def _render_models_table(console: Console) -> None:
     console.print(table)
 
 
+def _cmd_integrations(session: ReplSession, console: Console, args: list[str]) -> bool:  # noqa: ARG001
+    sub = (args[0].lower() if args else "list").strip()
+
+    if sub in ("list", "ls"):
+        _render_integrations_table(console, _load_verified_integrations())
+        return True
+
+    if sub == "verify":
+        results = _load_verified_integrations()
+        _render_integrations_table(console, results)
+        failed = [r for r in results if r.get("status") in ("failed", "missing")]
+        if failed:
+            console.print(f"[yellow]{len(failed)} integration(s) need attention.[/yellow]")
+        else:
+            console.print("[green]all integrations ok.[/green]")
+        return True
+
+    if sub == "show":
+        if len(args) < 2:
+            console.print("[red]usage:[/red] /integrations show <service>")
+            return True
+        service = args[1].lower()
+        results = _load_verified_integrations()
+        match = next((r for r in results if r.get("service") == service), None)
+        if match is None:
+            console.print(f"[red]service not found:[/red] {escape(service)}")
+            return True
+        table = Table(title=f"Integration: {service}", title_style="bold cyan", show_header=False)
+        table.add_column("key", style="bold")
+        table.add_column("value")
+        for k, v in match.items():
+            table.add_row(k, str(v))
+        console.print(table)
+        return True
+
+    console.print(
+        f"[red]unknown subcommand:[/red] {escape(sub)}  "
+        "(try [bold]/integrations list[/bold], [bold]/integrations verify[/bold], "
+        "or [bold]/integrations show <service>[/bold])"
+    )
+    return True
+
+
+def _cmd_mcp(session: ReplSession, console: Console, args: list[str]) -> bool:  # noqa: ARG001
+    sub = (args[0].lower() if args else "list").strip()
+
+    if sub in ("list", "ls"):
+        _render_mcp_table(console, _load_verified_integrations())
+        return True
+
+    if sub == "connect":
+        console.print(
+            "[dim]to connect an MCP server, run:[/dim] [bold]opensre integrations setup[/bold]"
+        )
+        return True
+
+    if sub == "disconnect":
+        console.print(
+            "[dim]to remove an MCP server, run:[/dim] [bold]opensre integrations remove <service>[/bold]"
+        )
+        return True
+
+    console.print(
+        f"[red]unknown subcommand:[/red] {escape(sub)}  "
+        "(try [bold]/mcp list[/bold], [bold]/mcp connect[/bold], or [bold]/mcp disconnect[/bold])"
+    )
+    return True
+
+
+def _cmd_model(session: ReplSession, console: Console, args: list[str]) -> bool:  # noqa: ARG001
+    sub = (args[0].lower() if args else "show").strip()
+
+    if sub == "show":
+        _render_models_table(console)
+        return True
+
+    if sub == "set":
+        console.print(
+            "[yellow]model switching mid-session is not yet supported.[/yellow]\n"
+            "[dim]set LLM_PROVIDER / model env vars and restart opensre.[/dim]"
+        )
+        return True
+
+    console.print(
+        f"[red]unknown subcommand:[/red] {escape(sub)}  "
+        "(try [bold]/model show[/bold] or [bold]/model set <id>[/bold])"
+    )
+    return True
+
+
+def _cmd_health(session: ReplSession, console: Console, args: list[str]) -> bool:  # noqa: ARG001
+    from app.cli.health_view import render_health_report
+    from app.config import get_environment
+    from app.integrations.store import STORE_PATH
+    from app.integrations.verify import verify_integrations
+
+    results = verify_integrations()
+    environment = get_environment().value
+    render_health_report(
+        console=console,
+        environment=environment,
+        integration_store_path=STORE_PATH,
+        results=results,
+    )
+    return True
+
+
+def _cmd_doctor(session: ReplSession, console: Console, args: list[str]) -> bool:  # noqa: ARG001
+    from app.cli.commands.doctor import _CHECKS, _check
+
+    _STATUS_STYLES: dict[str, str] = {"ok": "green", "warn": "yellow", "error": "red"}
+    table = Table(title="OpenSRE Doctor", title_style="bold cyan")
+    table.add_column("check", style="bold")
+    table.add_column("status")
+    table.add_column("detail", style="dim", overflow="fold")
+
+    issues = 0
+    for name, fn in _CHECKS:
+        result = _check(name, fn)
+        status = result["status"]
+        style = _STATUS_STYLES.get(status, "dim")
+        table.add_row(name, f"[{style}]{status}[/{style}]", result["detail"])
+        if status in ("warn", "error"):
+            issues += 1
+
+    console.print(table)
+    if issues:
+        console.print(f"[yellow]{issues} issue(s) found.[/yellow]")
+    else:
+        console.print("[green]all checks passed.[/green]")
+    return True
+
+
+def _cmd_version(session: ReplSession, console: Console, args: list[str]) -> bool:  # noqa: ARG001
+    import platform
+
+    from app.version import get_version
+
+    table = Table(title="Version info", title_style="bold cyan", show_header=False)
+    table.add_column("key", style="bold")
+    table.add_column("value")
+    table.add_row("opensre", get_version())
+    table.add_row("python", platform.python_version())
+    table.add_row("os", f"{platform.system().lower()} ({platform.machine()})")
+    console.print(table)
+    return True
+
+
+def _cmd_template(session: ReplSession, console: Console, args: list[str]) -> bool:  # noqa: ARG001
+    import json
+
+    from app.cli.alert_templates import build_alert_template
+    from app.cli.constants import ALERT_TEMPLATE_CHOICES
+
+    if not args:
+        console.print(
+            "[red]usage:[/red] /template <type>  "
+            f"(choices: {', '.join(ALERT_TEMPLATE_CHOICES)})"
+        )
+        return True
+
+    template_name = args[0].lower()
+    try:
+        payload = build_alert_template(template_name)
+    except ValueError:
+        console.print(
+            f"[red]unknown template:[/red] {escape(template_name)}  "
+            f"(choices: {', '.join(ALERT_TEMPLATE_CHOICES)})"
+        )
+        return True
+
+    console.print_json(json.dumps(payload, indent=2))
+    return True
+
+
+def _cmd_investigate_file(session: ReplSession, console: Console, args: list[str]) -> bool:
+    from pathlib import Path
+
+    from app.cli.investigate import run_investigation_for_session
+
+    if not args:
+        console.print("[red]usage:[/red] /investigate <file>")
+        return True
+
+    path = Path(args[0])
+    if not path.exists():
+        console.print(f"[red]file not found:[/red] {escape(str(path))}")
+        return True
+
+    try:
+        text = path.read_text(encoding="utf-8")
+    except Exception as exc:  # noqa: BLE001
+        console.print(f"[red]cannot read file:[/red] {escape(str(exc))}")
+        return True
+
+    try:
+        final_state = run_investigation_for_session(
+            alert_text=text,
+            context_overrides=session.accumulated_context or None,
+        )
+    except KeyboardInterrupt:
+        console.print("[yellow]investigation cancelled.[/yellow]")
+        session.record("alert", args[0], ok=False)
+        return True
+    except Exception as exc:  # noqa: BLE001
+        console.print(f"[red]investigation failed:[/red] {escape(str(exc))}")
+        session.record("alert", args[0], ok=False)
+        return True
+
+    session.last_state = final_state
+    session.record("alert", f"/investigate {args[0]}")
+    return True
+
+
 def _cmd_list(session: ReplSession, console: Console, args: list[str]) -> bool:  # noqa: ARG001
     sub = (args[0].lower() if args else "").strip()
 
@@ -195,6 +409,142 @@ def _cmd_list(session: ReplSession, console: Console, args: list[str]) -> bool: 
     return True
 
 
+def _cmd_history(session: ReplSession, console: Console, args: list[str]) -> bool:  # noqa: ARG001
+    if not session.history:
+        console.print("[dim]no history yet.[/dim]")
+        return True
+
+    table = Table(title="Session history", title_style="bold cyan")
+    table.add_column("#", style="dim", justify="right")
+    table.add_column("type", style="bold")
+    table.add_column("ok")
+    table.add_column("text", overflow="fold")
+
+    for i, entry in enumerate(session.history, start=1):
+        ok_flag = entry.get("ok", True)
+        ok_style = "green" if ok_flag else "red"
+        ok_label = "✓" if ok_flag else "✗"
+        table.add_row(
+            str(i),
+            entry.get("type", "?"),
+            f"[{ok_style}]{ok_label}[/{ok_style}]",
+            escape(str(entry.get("text", ""))),
+        )
+    console.print(table)
+    return True
+
+
+def _cmd_last(session: ReplSession, console: Console, args: list[str]) -> bool:  # noqa: ARG001
+    if session.last_state is None:
+        console.print("[dim]no investigation in this session yet.[/dim]")
+        return True
+
+    root_cause = session.last_state.get("root_cause", "")
+    report = session.last_state.get("problem_md") or session.last_state.get("slack_message") or ""
+
+    if root_cause:
+        console.print(f"[bold cyan]root cause:[/bold cyan] {escape(str(root_cause))}")
+    if report:
+        console.print(escape(str(report)))
+    if not root_cause and not report:
+        console.print("[dim]last investigation has no report content.[/dim]")
+    return True
+
+
+def _cmd_save(session: ReplSession, console: Console, args: list[str]) -> bool:
+    import json
+    from pathlib import Path
+
+    if session.last_state is None:
+        console.print("[dim]nothing to save — run an investigation first.[/dim]")
+        return True
+
+    if not args:
+        console.print("[red]usage:[/red] /save <path>  (e.g. /save report.md or /save out.json)")
+        return True
+
+    dest = Path(args[0])
+    try:
+        if dest.suffix.lower() == ".json":
+            dest.write_text(
+                json.dumps(session.last_state, indent=2, default=str), encoding="utf-8"
+            )
+        else:
+            root_cause = session.last_state.get("root_cause", "")
+            report = (
+                session.last_state.get("problem_md")
+                or session.last_state.get("slack_message")
+                or ""
+            )
+            lines = []
+            if root_cause:
+                lines.append(f"## Root Cause\n\n{root_cause}\n")
+            if report:
+                lines.append(f"## Report\n\n{report}\n")
+            dest.write_text("\n".join(lines) or "(no report content)", encoding="utf-8")
+        console.print(f"[green]saved:[/green] {escape(str(dest))}")
+    except Exception as exc:  # noqa: BLE001
+        console.print(f"[red]save failed:[/red] {escape(str(exc))}")
+    return True
+
+
+def _cmd_context(session: ReplSession, console: Console, args: list[str]) -> bool:  # noqa: ARG001
+    if not session.accumulated_context:
+        console.print("[dim]no infra context accumulated yet.[/dim]")
+        return True
+
+    table = Table(title="Accumulated context", title_style="bold cyan", show_header=False)
+    table.add_column("key", style="bold")
+    table.add_column("value")
+    for k, v in sorted(session.accumulated_context.items()):
+        table.add_row(k, escape(str(v)))
+    console.print(table)
+    return True
+
+
+def _cmd_cost(session: ReplSession, console: Console, args: list[str]) -> bool:  # noqa: ARG001
+    table = Table(title="Session cost", title_style="bold cyan", show_header=False)
+    table.add_column("key", style="bold")
+    table.add_column("value")
+    table.add_row("interactions", str(len(session.history)))
+
+    if session.token_usage:
+        inp = session.token_usage.get("input", 0)
+        out = session.token_usage.get("output", 0)
+        table.add_row("input tokens", f"{inp:,}")
+        table.add_row("output tokens", f"{out:,}")
+    else:
+        table.add_row("token usage", "[dim]not available (LangSmith not wired yet)[/dim]")
+
+    console.print(table)
+    return True
+
+
+def _cmd_verbose(session: ReplSession, console: Console, args: list[str]) -> bool:  # noqa: ARG001
+    if args and args[0].lower() in ("off", "false", "0", "disable"):
+        os.environ.pop("TRACER_VERBOSE", None)
+        console.print("[dim]verbose logging off[/dim]")
+    else:
+        os.environ["TRACER_VERBOSE"] = "1"
+        console.print("[yellow]verbose logging on[/yellow]")
+    return True
+
+
+def _cmd_compact(session: ReplSession, console: Console, args: list[str]) -> bool:  # noqa: ARG001
+    before = len(session.history)
+    if before > 20:
+        session.history = session.history[-20:]
+        console.print(f"[dim]compacted: kept last 20 of {before} entries.[/dim]")
+    else:
+        console.print(f"[dim]nothing to compact ({before} entries, limit is 20).[/dim]")
+    return True
+
+
+def _cmd_stop(session: ReplSession, console: Console, args: list[str]) -> bool:  # noqa: ARG001
+    console.print("[dim]press [bold]Ctrl+C[/bold] to cancel an in-flight investigation.[/dim]")
+    return True
+
+
 SLASH_COMMANDS: dict[str, SlashCommand] = {
     "/help": SlashCommand("/help", "show available commands", _cmd_help),
     "/?": SlashCommand("/?", "shortcut for /help", _cmd_help),
@@ -210,6 +560,49 @@ SLASH_COMMANDS: dict[str, SlashCommand] = {
         "('/list integrations', '/list models', '/list mcp')",
         _cmd_list,
     ),
+    "/integrations": SlashCommand(
+        "/integrations",
+        "manage integrations ('/integrations list', '/integrations verify', '/integrations show <service>')",
+        _cmd_integrations,
+    ),
+    "/mcp": SlashCommand(
+        "/mcp",
+        "manage MCP servers ('/mcp list', '/mcp connect', '/mcp disconnect')",
+        _cmd_mcp,
+    ),
+    "/model": SlashCommand(
+        "/model",
+        "show or set the active LLM ('/model show', '/model set <id>')",
+        _cmd_model,
+    ),
+    "/health": SlashCommand("/health", "show integration and agent health", _cmd_health),
+    "/doctor": SlashCommand("/doctor", "run full environment diagnostic", _cmd_doctor),
+    "/version": SlashCommand("/version", "print version, Python and OS info", _cmd_version),
+    "/template": SlashCommand(
+        "/template",
+        "print a starter alert JSON template ('/template generic|datadog|grafana|honeycomb|coralogix')",
+        _cmd_template,
+    ),
+    "/investigate": SlashCommand(
+        "/investigate",
+        "run an RCA investigation from a file ('/investigate <file>')",
+        _cmd_investigate_file,
+    ),
+    "/history": SlashCommand("/history", "show session interaction history", _cmd_history),
+    "/last": SlashCommand("/last", "reprint the most recent investigation report", _cmd_last),
+    "/save": SlashCommand(
+        "/save", "save last investigation to a file ('/save <path>')", _cmd_save
+    ),
+    "/context": SlashCommand("/context", "show accumulated infra context", _cmd_context),
+    "/cost": SlashCommand("/cost", "show token usage and session cost", _cmd_cost),
+    "/verbose": SlashCommand(
+        "/verbose", "toggle verbose logging ('/verbose off' to disable)", _cmd_verbose
+    ),
+    "/compact": SlashCommand("/compact", "trim old session history to free memory", _cmd_compact),
+    "/stop": SlashCommand(
+        "/stop", "reminder: press Ctrl+C to cancel an in-flight investigation", _cmd_stop
+    ),
+    "/cancel": SlashCommand("/cancel", "alias for /stop", _cmd_stop),
 }
 
 

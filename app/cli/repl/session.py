@@ -30,6 +30,9 @@ class ReplSession:
     """If True, skip any future [Y/n] confirmation prompts for read-only tools.
     (No destructive tools exist today; reserved for forward compatibility.)"""
 
+    token_usage: dict[str, int] = field(default_factory=dict)
+    """Accumulated token counts: {"input": N, "output": N}. Populated when available."""
+
     def record(self, kind: str, text: str, *, ok: bool = True) -> None:
         """Append an entry to the session history."""
         self.history.append({"type": kind, "text": text, "ok": ok})
@@ -39,4 +42,5 @@ class ReplSession:
         self.history.clear()
         self.last_state = None
         self.accumulated_context.clear()
+        self.token_usage.clear()
         # trust_mode is intentionally preserved across /reset
