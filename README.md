@@ -558,6 +558,13 @@ Thanks goes to these amazing people:
         </a>
     </td>
             <td align="center">
+        <a href="https://github.com/sharkello">
+            <img src="https://avatars.githubusercontent.com/u/159360024?v=4" width="100" alt="sharkello"/>
+            <br />
+            <sub><b>sharkello</b></sub>
+        </a>
+    </td>
+            <td align="center">
         <a href="https://github.com/aniruddhaadak80">
             <img src="https://avatars.githubusercontent.com/u/127435065?v=4" width="100" alt="aniruddhaadak80"/>
             <br />
