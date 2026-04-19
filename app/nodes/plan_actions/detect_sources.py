@@ -1156,6 +1156,23 @@ def detect_sources(
             "connection_verified": True,
         }
 
+    rabbitmq_int = (resolved_integrations or {}).get("rabbitmq")
+    if (
+        rabbitmq_int
+        and str(rabbitmq_int.get("host", "")).strip()
+        and str(rabbitmq_int.get("username", "")).strip()
+    ):
+        sources["rabbitmq"] = {
+            "host": str(rabbitmq_int.get("host", "")).strip(),
+            "management_port": rabbitmq_int.get("management_port", 15672),
+            "username": str(rabbitmq_int.get("username", "")).strip(),
+            "password": str(rabbitmq_int.get("password") or ""),
+            "vhost": str(rabbitmq_int.get("vhost", "/")).strip() or "/",
+            "ssl": rabbitmq_int.get("ssl", False),
+            "verify_ssl": rabbitmq_int.get("verify_ssl", True),
+            "connection_verified": True,
+        }
+
     alertmanager_int = (resolved_integrations or {}).get("alertmanager")
     if alertmanager_int and str(alertmanager_int.get("base_url", "")).strip():
         # Carry label filters from the alert when present so tools can pre-scope the query

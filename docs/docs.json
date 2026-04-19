@@ -63,6 +63,7 @@
               "bitbucket",
               "vercel",
               "kafka",
+              "rabbitmq",
               "clickhouse",
               "alertmanager",
               "opsgenie",

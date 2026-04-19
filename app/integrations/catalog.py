@@ -30,6 +30,7 @@ from app.integrations.mongodb_atlas import build_mongodb_atlas_config
 from app.integrations.mysql import build_mysql_config
 from app.integrations.openclaw import build_openclaw_config
 from app.integrations.postgresql import build_postgresql_config
+from app.integrations.rabbitmq import build_rabbitmq_config
 from app.integrations.sentry import build_sentry_config
 from app.integrations.store import _STRUCTURAL_RECORD_FIELDS, load_integrations
 from app.services.vercel import VercelConfig
@@ -59,6 +60,8 @@ _SERVICE_KEY_MAP = {
     "mongodb_atlas": "mongodb_atlas",
     "atlas": "mongodb_atlas",
     "mariadb": "mariadb",
+    "rabbitmq": "rabbitmq",
+    "amqp": "rabbitmq",
     "vercel": "vercel",
     "opsgenie": "opsgenie",
     "jira": "jira",
@@ -525,6 +528,34 @@ def _classify_service_instance(
                 "ssl_mode": mysql_config.ssl_mode,
                 "integration_id": record_id,
             }, "mysql"
+        return None, None
+
+    if key == "rabbitmq":
+        try:
+            rabbitmq_config = build_rabbitmq_config(
+                {
+                    "host": credentials.get("host", ""),
+                    "management_port": credentials.get("management_port", 15672),
+                    "username": credentials.get("username", ""),
+                    "password": credentials.get("password", ""),
+                    "vhost": credentials.get("vhost", "/"),
+                    "ssl": credentials.get("ssl", False),
+                    "verify_ssl": credentials.get("verify_ssl", True),
+                }
+            )
+        except Exception:
+            return None, None
+        if rabbitmq_config.host and rabbitmq_config.username:
+            return {
+                "host": rabbitmq_config.host,
+                "management_port": rabbitmq_config.management_port,
+                "username": rabbitmq_config.username,
+                "password": rabbitmq_config.password,
+                "vhost": rabbitmq_config.vhost,
+                "ssl": rabbitmq_config.ssl,
+                "verify_ssl": rabbitmq_config.verify_ssl,
+                "integration_id": record_id,
+            }, "rabbitmq"
         return None, None
 
     if key == "azure_sql":
@@ -1134,6 +1165,38 @@ def load_env_integrations() -> list[dict[str, Any]]:
         except Exception:
             logger.debug("Failed to load MariaDB config from env", exc_info=True)
 
+    rabbitmq_host = os.getenv("RABBITMQ_HOST", "").strip()
+    rabbitmq_username = os.getenv("RABBITMQ_USERNAME", "").strip()
+    if rabbitmq_host and rabbitmq_username:
+        try:
+            rabbitmq_config = build_rabbitmq_config(
+                {
+                    "host": rabbitmq_host,
+                    "management_port": os.getenv(
+                        "RABBITMQ_MANAGEMENT_PORT", "15672"
+                    ).strip(),
+                    "username": rabbitmq_username,
+                    "password": os.getenv("RABBITMQ_PASSWORD", ""),
+                    "vhost": os.getenv("RABBITMQ_VHOST", "/").strip(),
+                    "ssl": os.getenv("RABBITMQ_SSL", "false").strip().lower()
+                    in ("true", "1", "yes"),
+                    "verify_ssl": os.getenv("RABBITMQ_VERIFY_SSL", "true")
+                    .strip()
+                    .lower()
+                    in ("true", "1", "yes"),
+                }
+            )
+            integrations.append(
+                {
+                    "id": "env-rabbitmq",
+                    "service": "rabbitmq",
+                    "status": "active",
+                    "credentials": rabbitmq_config.model_dump(exclude={"integration_id"}),
+                }
+            )
+        except Exception:
+            logger.debug("Failed to load RabbitMQ config from env", exc_info=True)
+
     mysql_host = os.getenv("MYSQL_HOST", "").strip()
     mysql_database = os.getenv("MYSQL_DATABASE", "").strip()
     if mysql_host and mysql_database:
@@ -1397,6 +1460,7 @@ def resolve_effective_integrations(
         "postgresql",
         "mongodb_atlas",
         "mariadb",
+        "rabbitmq",
         "vercel",
         "opsgenie",
         "jira",
