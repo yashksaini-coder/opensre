@@ -67,6 +67,10 @@ SUPPORTED_VERIFY_SERVICES = (
     "discord",
     "mysql",
     "openclaw",
+    "snowflake",
+    "azure",
+    "openobserve",
+    "opensearch",
 )
 CORE_VERIFY_SERVICES = frozenset({"grafana", "datadog", "honeycomb", "coralogix", "aws"})
 _SUPPORTED_GRAFANA_TYPES = ("loki", "tempo", "prometheus")
@@ -692,6 +696,62 @@ def _verify_mysql(source: str, config: dict[str, Any]) -> dict[str, str]:
     )
 
 
+def _verify_snowflake(source: str, config: dict[str, Any]) -> dict[str, str]:
+    account_identifier = str(config.get("account_identifier", "")).strip()
+    token = str(config.get("token", "")).strip()
+    if not account_identifier:
+        return _result("snowflake", source, "missing", "Missing account_identifier.")
+    if not token:
+        return _result("snowflake", source, "missing", "Missing token credentials.")
+    return _result(
+        "snowflake",
+        source,
+        "passed",
+        f"Snowflake credentials are configured for account {account_identifier}.",
+    )
+
+
+def _verify_azure(source: str, config: dict[str, Any]) -> dict[str, str]:
+    workspace_id = str(config.get("workspace_id", "")).strip()
+    access_token = str(config.get("access_token", "")).strip()
+    endpoint = str(config.get("endpoint", "https://api.loganalytics.io")).strip()
+    if not workspace_id:
+        return _result("azure", source, "missing", "Missing workspace_id.")
+    if not access_token:
+        return _result("azure", source, "missing", "Missing access_token.")
+    return _result(
+        "azure",
+        source,
+        "passed",
+        f"Azure Log Analytics credentials are configured for workspace "
+        f"{workspace_id} at {endpoint}.",
+    )
+
+
+def _verify_openobserve(source: str, config: dict[str, Any]) -> dict[str, str]:
+    base_url = str(config.get("base_url", "")).strip()
+    api_token = str(config.get("api_token", "")).strip()
+    username = str(config.get("username", "")).strip()
+    password = str(config.get("password", "")).strip()
+    if not base_url:
+        return _result("openobserve", source, "missing", "Missing base_url.")
+    if not api_token and not (username and password):
+        return _result("openobserve", source, "missing", "Missing api_token or username/password.")
+    return _result(
+        "openobserve",
+        source,
+        "passed",
+        f"OpenObserve credentials are configured for {base_url}.",
+    )
+
+
+def _verify_opensearch(source: str, config: dict[str, Any]) -> dict[str, str]:
+    url = str(config.get("url", "")).strip()
+    if not url:
+        return _result("opensearch", source, "missing", "Missing url.")
+    return _result("opensearch", source, "passed", f"OpenSearch endpoint configured: {url}.")
+
+
 def verify_integrations(
     service: str | None = None,
     *,
@@ -776,6 +836,14 @@ def verify_integrations(
             results.append(_verify_mysql(source, config))
         elif current_service == "alertmanager":
             results.append(_verify_alertmanager(source, config))
+        elif current_service == "snowflake":
+            results.append(_verify_snowflake(source, config))
+        elif current_service == "azure":
+            results.append(_verify_azure(source, config))
+        elif current_service == "openobserve":
+            results.append(_verify_openobserve(source, config))
+        elif current_service == "opensearch":
+            results.append(_verify_opensearch(source, config))
 
     return results
 

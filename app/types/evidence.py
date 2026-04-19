@@ -36,5 +36,9 @@ EvidenceSource = Literal[
     "openclaw",
     "mysql",
     "rabbitmq",
+    "snowflake",
+    "azure",
+    "openobserve",
+    "opensearch",
     "alertmanager",
 ]

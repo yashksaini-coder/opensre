@@ -568,4 +568,8 @@ class EffectiveIntegrations(StrictConfigModel):
     discord: EffectiveIntegrationEntry | None = None
     openclaw: EffectiveIntegrationEntry | None = None
     mysql: EffectiveIntegrationEntry | None = None
+    snowflake: EffectiveIntegrationEntry | None = None
+    azure: EffectiveIntegrationEntry | None = None
+    openobserve: EffectiveIntegrationEntry | None = None
+    opensearch: EffectiveIntegrationEntry | None = None
     alertmanager: EffectiveIntegrationEntry | None = None
