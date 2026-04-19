@@ -78,7 +78,9 @@ def cli(
                 cli_enabled=interactive,
                 cli_layout=layout,
             )
-            raise SystemExit(run_repl(config=config))
+            if config.enabled:
+                raise SystemExit(run_repl(config=config))
+        click.echo("🚧 OpenSRE is in Public Beta — features may change.", err=True)
         render_landing()
         raise SystemExit(0)
 
