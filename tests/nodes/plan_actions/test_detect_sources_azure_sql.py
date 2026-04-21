@@ -43,6 +43,25 @@ def test_detect_sources_azure_sql_uses_annotation_database_override() -> None:
     assert sources["azure_sql"]["database"] == "tenant_a"
 
 
+def test_detect_sources_azure_sql_uses_generic_database_annotation_fallback() -> None:
+    """Tier-2 fallback: a generic `database` annotation (with no
+    `azure_sql_database` key) should override the stored database, matching
+    the behaviour of the mysql/postgresql branches."""
+    sources = detect_sources(
+        raw_alert={"annotations": {"database": "tenant_b"}},
+        context={},
+        resolved_integrations={
+            "azure_sql": {
+                "server": "prod.db.windows.net",
+                "database": "orders",
+                "port": DEFAULT_AZURE_SQL_PORT,
+            }
+        },
+    )
+
+    assert sources["azure_sql"]["database"] == "tenant_b"
+
+
 def test_detect_sources_azure_sql_ignores_blank_annotation_override() -> None:
     sources = detect_sources(
         raw_alert={"commonAnnotations": {"azure_sql_database": "   "}},
