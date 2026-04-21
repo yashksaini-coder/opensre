@@ -42,12 +42,16 @@ def version_command() -> None:
     """Print detailed version, Python and OS info."""
     capture_cli_invoked()
     if is_json_output():
-        click.echo(json.dumps({
-            "opensre": get_version(),
-            "python": platform.python_version(),
-            "os": platform.system().lower(),
-            "arch": platform.machine(),
-        }))
+        click.echo(
+            json.dumps(
+                {
+                    "opensre": get_version(),
+                    "python": platform.python_version(),
+                    "os": platform.system().lower(),
+                    "arch": platform.machine(),
+                }
+            )
+        )
         return
     click.echo(f"opensre {get_version()}")
     click.echo(f"Python  {platform.python_version()}")
@@ -56,7 +60,9 @@ def version_command() -> None:
 
 @click.command(name="health")
 @click.option("--watch", is_flag=True, help="Continuously refresh the health report.")
-@click.option("--rate", default=5, show_default=True, help="Refresh interval in seconds (with --watch).")
+@click.option(
+    "--rate", default=5, show_default=True, help="Refresh interval in seconds (with --watch)."
+)
 def health_command(watch: bool, rate: int) -> None:
     """Show a quick health summary of the local agent setup."""
     from app.cli.health_view import render_health_json, render_health_report
