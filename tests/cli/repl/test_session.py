@@ -35,3 +35,51 @@ class TestReplSession:
         assert session.last_state is None
         assert session.accumulated_context == {}
         assert session.trust_mode is True  # preserved intentionally
+
+    def test_accumulate_from_state_extracts_known_keys(self) -> None:
+        session = ReplSession()
+        session.accumulate_from_state(
+            {
+                "service": "orders-api",
+                "pipeline_name": "events_fact",
+                "cluster_name": "prod-us-east",
+                "region": "us-east-1",
+                "environment": "production",
+                "root_cause": "disk full",  # not accumulated
+                "evidence": {"ev-1": "x"},  # not accumulated
+            }
+        )
+        assert session.accumulated_context == {
+            "service": "orders-api",
+            "pipeline_name": "events_fact",
+            "cluster_name": "prod-us-east",
+            "region": "us-east-1",
+            "environment": "production",
+        }
+
+    def test_accumulate_from_state_skips_empty_and_none(self) -> None:
+        session = ReplSession()
+        session.accumulate_from_state(
+            {
+                "service": "",
+                "cluster_name": None,
+                "region": "us-east-1",
+            }
+        )
+        assert session.accumulated_context == {"region": "us-east-1"}
+
+    def test_accumulate_from_state_merges_across_calls(self) -> None:
+        """Subsequent investigations fill in context the earlier one didn't have."""
+        session = ReplSession()
+        session.accumulate_from_state({"service": "orders-api"})
+        session.accumulate_from_state({"cluster_name": "prod-us-east"})
+        assert session.accumulated_context == {
+            "service": "orders-api",
+            "cluster_name": "prod-us-east",
+        }
+
+    def test_accumulate_from_state_handles_none_and_empty_state(self) -> None:
+        session = ReplSession()
+        session.accumulate_from_state(None)
+        session.accumulate_from_state({})
+        assert session.accumulated_context == {}

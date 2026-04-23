@@ -33,9 +33,35 @@ class ReplSession:
     token_usage: dict[str, int] = field(default_factory=dict)
     """Accumulated token counts: {"input": N, "output": N}. Populated when available."""
 
+    # Keys from a completed AgentState that carry reusable infra context into
+    # the next investigation.  Kept as a class-level tuple so any caller that
+    # wants to know "what counts as accumulated context" has a single source.
+    _ACCUMULATED_KEYS: tuple[str, ...] = (
+        "service",
+        "pipeline_name",
+        "cluster_name",
+        "region",
+        "environment",
+    )
+
     def record(self, kind: str, text: str, *, ok: bool = True) -> None:
         """Append an entry to the session history."""
         self.history.append({"type": kind, "text": text, "ok": ok})
+
+    def accumulate_from_state(self, state: dict[str, Any] | None) -> None:
+        """Extract reusable infra hints from a completed investigation state.
+
+        Called after every successful investigation (whether triggered by
+        free-text input or by the ``/investigate`` slash command) so that
+        subsequent investigations within the same REPL session inherit the
+        service / cluster / region context discovered earlier.
+        """
+        if not state:
+            return
+        for key in self._ACCUMULATED_KEYS:
+            value = state.get(key)
+            if value:
+                self.accumulated_context[key] = value
 
     def clear(self) -> None:
         """Reset the session to a fresh state (used by /reset)."""

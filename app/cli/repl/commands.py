@@ -320,8 +320,7 @@ def _cmd_template(session: ReplSession, console: Console, args: list[str]) -> bo
 
     if not args:
         console.print(
-            "[red]usage:[/red] /template <type>  "
-            f"(choices: {', '.join(ALERT_TEMPLATE_CHOICES)})"
+            f"[red]usage:[/red] /template <type>  (choices: {', '.join(ALERT_TEMPLATE_CHOICES)})"
         )
         return True
 
@@ -374,6 +373,11 @@ def _cmd_investigate_file(session: ReplSession, console: Console, args: list[str
         return True
 
     session.last_state = final_state
+    # Match `_run_new_alert` in loop.py: inherit service / cluster / region
+    # across subsequent investigations in the same REPL session.  Without
+    # this, follow-up free-text alerts would lose context that `/investigate`
+    # just discovered (#243 requirement 7: "the session remembers everything").
+    session.accumulate_from_state(final_state)
     session.record("alert", f"/investigate {args[0]}")
     return True
 
@@ -466,9 +470,7 @@ def _cmd_save(session: ReplSession, console: Console, args: list[str]) -> bool:
     dest = Path(args[0])
     try:
         if dest.suffix.lower() == ".json":
-            dest.write_text(
-                json.dumps(session.last_state, indent=2, default=str), encoding="utf-8"
-            )
+            dest.write_text(json.dumps(session.last_state, indent=2, default=str), encoding="utf-8")
         else:
             root_cause = session.last_state.get("root_cause", "")
             report = (
@@ -590,9 +592,7 @@ SLASH_COMMANDS: dict[str, SlashCommand] = {
     ),
     "/history": SlashCommand("/history", "show session interaction history", _cmd_history),
     "/last": SlashCommand("/last", "reprint the most recent investigation report", _cmd_last),
-    "/save": SlashCommand(
-        "/save", "save last investigation to a file ('/save <path>')", _cmd_save
-    ),
+    "/save": SlashCommand("/save", "save last investigation to a file ('/save <path>')", _cmd_save),
     "/context": SlashCommand("/context", "show accumulated infra context", _cmd_context),
     "/cost": SlashCommand("/cost", "show token usage and session cost", _cmd_cost),
     "/verbose": SlashCommand(
@@ -615,8 +615,6 @@ def dispatch_slash(command_line: str, session: ReplSession, console: Console) ->
     args = parts[1:]
     cmd = SLASH_COMMANDS.get(name)
     if cmd is None:
-        console.print(
-            f"[red]unknown command:[/red] {escape(name)}  (type [bold]/help[/bold])"
-        )
+        console.print(f"[red]unknown command:[/red] {escape(name)}  (type [bold]/help[/bold])")
         return True
     return cmd.handler(session, console, args)

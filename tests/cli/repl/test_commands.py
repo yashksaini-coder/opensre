@@ -152,9 +152,7 @@ class TestListCommand:
         assert "toolcall model" in output
         assert "anthropic" in output
 
-    def test_list_models_handles_missing_env_gracefully(
-        self, monkeypatch: object
-    ) -> None:
+    def test_list_models_handles_missing_env_gracefully(self, monkeypatch: object) -> None:
         from app.cli.repl import commands as cmd_module
 
         monkeypatch.setattr(  # type: ignore[attr-defined]
@@ -182,9 +180,7 @@ class TestListCommand:
         assert "unknown list target" in output
         assert "/list integrations" in output
 
-    def test_list_empty_integrations_prints_onboarding_hint(
-        self, monkeypatch: object
-    ) -> None:
+    def test_list_empty_integrations_prints_onboarding_hint(self, monkeypatch: object) -> None:
         from app.cli.repl import commands as cmd_module
 
         monkeypatch.setattr(  # type: ignore[attr-defined]
@@ -211,6 +207,7 @@ class TestIntegrationsCommand:
 
     def _patch(self, monkeypatch: object) -> None:
         from app.cli.repl import commands as m
+
         monkeypatch.setattr(m, "_load_verified_integrations", lambda: list(self._FAKE))  # type: ignore[attr-defined]
 
     def test_list_shows_non_mcp_services(self, monkeypatch: object) -> None:
@@ -234,9 +231,14 @@ class TestIntegrationsCommand:
 
     def test_verify_all_ok(self, monkeypatch: object) -> None:
         from app.cli.repl import commands as m
-        monkeypatch.setattr(m, "_load_verified_integrations", lambda: [  # type: ignore[attr-defined]
-            {"service": "datadog", "source": "env", "status": "ok", "detail": "ok"},
-        ])
+
+        monkeypatch.setattr(
+            m,
+            "_load_verified_integrations",
+            lambda: [  # type: ignore[attr-defined]
+                {"service": "datadog", "source": "env", "status": "ok", "detail": "ok"},
+            ],
+        )
         console, buf = _capture()
         dispatch_slash("/integrations verify", ReplSession(), console)
         assert "all integrations ok" in buf.getvalue()
@@ -274,6 +276,7 @@ class TestMcpCommand:
 
     def _patch(self, monkeypatch: object) -> None:
         from app.cli.repl import commands as m
+
         monkeypatch.setattr(m, "_load_verified_integrations", lambda: list(self._FAKE))  # type: ignore[attr-defined]
 
     def test_list_shows_mcp_services(self, monkeypatch: object) -> None:
@@ -396,6 +399,39 @@ class TestInvestigateFileCommand:
         dispatch_slash(f"/investigate {alert_file}", session, console)
         assert session.last_state == {"root_cause": "test cause"}
         assert '{"alert_name": "test"}' in captured[0]
+
+    def test_investigate_accumulates_infra_context(
+        self, tmp_path: object, monkeypatch: object
+    ) -> None:
+        """Regression for Greptile P1 (PR #591): /investigate previously skipped
+        the context-accumulation step that `loop._run_new_alert` does after a
+        free-text investigation, so subsequent follow-up alerts lost the infra
+        hints (service / cluster / region) that /investigate just discovered."""
+        import app.cli.investigate as inv_module
+
+        alert_file = tmp_path / "alert.json"  # type: ignore[operator]
+        alert_file.write_text('{"alert_name": "test"}', encoding="utf-8")  # type: ignore[union-attr]
+
+        def _fake(alert_text: str, context_overrides: object = None) -> dict:
+            return {
+                "root_cause": "disk full",
+                "service": "orders-api",
+                "cluster_name": "prod-us-east",
+                "region": "us-east-1",
+            }
+
+        monkeypatch.setattr(inv_module, "run_investigation_for_session", _fake)  # type: ignore[attr-defined]
+
+        session = ReplSession()
+        console, _ = _capture()
+        dispatch_slash(f"/investigate {alert_file}", session, console)
+
+        # The next free-text alert must inherit these — proving accumulation ran.
+        assert session.accumulated_context == {
+            "service": "orders-api",
+            "cluster_name": "prod-us-east",
+            "region": "us-east-1",
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -526,6 +562,7 @@ class TestCostCommand:
 class TestVerboseCommand:
     def test_on_sets_env_var(self, monkeypatch: object) -> None:
         import os
+
         monkeypatch.delenv("TRACER_VERBOSE", raising=False)  # type: ignore[attr-defined]
         console, buf = _capture()
         dispatch_slash("/verbose on", ReplSession(), console)
@@ -534,6 +571,7 @@ class TestVerboseCommand:
 
     def test_off_removes_env_var(self, monkeypatch: object) -> None:
         import os
+
         monkeypatch.setenv("TRACER_VERBOSE", "1")  # type: ignore[attr-defined]
         console, buf = _capture()
         dispatch_slash("/verbose off", ReplSession(), console)
@@ -542,6 +580,7 @@ class TestVerboseCommand:
 
     def test_no_arg_turns_on(self, monkeypatch: object) -> None:
         import os
+
         monkeypatch.delenv("TRACER_VERBOSE", raising=False)  # type: ignore[attr-defined]
         console, _ = _capture()
         dispatch_slash("/verbose", ReplSession(), console)

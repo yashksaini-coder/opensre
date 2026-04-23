@@ -39,16 +39,8 @@ def _run_new_alert(text: str, session: ReplSession, console: Console) -> None:
         return
 
     session.last_state = final_state
-    _accumulate_context(session, final_state)
+    session.accumulate_from_state(final_state)
     session.record("alert", text)
-
-
-def _accumulate_context(session: ReplSession, state: dict) -> None:
-    """Extract reusable infra hints from the completed state."""
-    for key in ("service", "pipeline_name", "cluster_name", "region", "environment"):
-        value = state.get(key)
-        if value:
-            session.accumulated_context[key] = value
 
 
 async def _run_one_turn(
