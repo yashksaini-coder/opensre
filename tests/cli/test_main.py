@@ -113,3 +113,72 @@ def test_default_no_args_enters_repl(monkeypatch) -> None:
         f"default no-args run must pass cli_enabled=True, got {load_calls[0]}"
     )
     assert landing_calls == [], "REPL should run, not landing page"
+
+
+def test_agent_subcommand_launches_repl(monkeypatch) -> None:
+    """`opensre agent` must always enter the REPL, even if config disables it.
+
+    The explicit subcommand expresses clear user intent, so env/file disables
+    are overridden by passing cli_enabled=True into ReplConfig.load.
+    """
+    monkeypatch.setattr("app.cli.__main__.capture_first_run_if_needed", lambda: None)
+    monkeypatch.setattr("app.cli.__main__.shutdown_analytics", lambda **_kw: None)
+    monkeypatch.setattr("app.cli.commands.agent.capture_cli_invoked", lambda: None)
+    monkeypatch.setenv("OPENSRE_INTERACTIVE", "0")
+
+    load_calls: list[dict] = []
+    orig_load = ReplConfig.load
+
+    @classmethod  # type: ignore[misc]
+    def spy_load(cls, **kw):  # type: ignore[no-untyped-def]
+        load_calls.append(kw)
+        return orig_load(**kw)
+
+    monkeypatch.setattr("app.cli.repl.config.ReplConfig.load", spy_load)
+
+    run_repl_calls: list[ReplConfig] = []
+
+    def fake_run_repl(**kw: object) -> int:
+        cfg = kw.get("config")
+        assert isinstance(cfg, ReplConfig)
+        run_repl_calls.append(cfg)
+        return 0
+
+    with (
+        patch("app.cli.repl.run_repl", side_effect=fake_run_repl),
+        patch("app.cli.repl.loop.run_repl", side_effect=fake_run_repl),
+    ):
+        exit_code = main(["agent"])
+
+    assert exit_code == 0
+    assert len(load_calls) == 1
+    assert load_calls[0].get("cli_enabled") is True
+    assert len(run_repl_calls) == 1
+    assert run_repl_calls[0].enabled is True, (
+        "agent subcommand must override OPENSRE_INTERACTIVE=0"
+    )
+
+
+def test_agent_subcommand_accepts_layout(monkeypatch) -> None:
+    """`opensre agent --layout pinned` must forward layout into ReplConfig."""
+    monkeypatch.setattr("app.cli.__main__.capture_first_run_if_needed", lambda: None)
+    monkeypatch.setattr("app.cli.__main__.shutdown_analytics", lambda **_kw: None)
+    monkeypatch.setattr("app.cli.commands.agent.capture_cli_invoked", lambda: None)
+
+    run_repl_calls: list[ReplConfig] = []
+
+    def fake_run_repl(**kw: object) -> int:
+        cfg = kw.get("config")
+        assert isinstance(cfg, ReplConfig)
+        run_repl_calls.append(cfg)
+        return 0
+
+    with (
+        patch("app.cli.repl.run_repl", side_effect=fake_run_repl),
+        patch("app.cli.repl.loop.run_repl", side_effect=fake_run_repl),
+    ):
+        exit_code = main(["agent", "--layout", "pinned"])
+
+    assert exit_code == 0
+    assert len(run_repl_calls) == 1
+    assert run_repl_calls[0].layout == "pinned"
