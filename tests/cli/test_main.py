@@ -154,9 +154,7 @@ def test_agent_subcommand_launches_repl(monkeypatch) -> None:
     assert len(load_calls) == 1
     assert load_calls[0].get("cli_enabled") is True
     assert len(run_repl_calls) == 1
-    assert run_repl_calls[0].enabled is True, (
-        "agent subcommand must override OPENSRE_INTERACTIVE=0"
-    )
+    assert run_repl_calls[0].enabled is True, "agent subcommand must override OPENSRE_INTERACTIVE=0"
 
 
 def test_agent_subcommand_accepts_layout(monkeypatch) -> None:
