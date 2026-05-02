@@ -1194,6 +1194,13 @@ Thanks goes to these amazing people:
             <sub><b>shivambehl</b></sub>
         </a>
     </td>
+            <td align="center">
+        <a href="https://github.com/retr0-kernel">
+            <img src="https://avatars.githubusercontent.com/u/82054542?v=4" width="100" alt="retr0-kernel"/>
+            <br />
+            <sub><b>retr0-kernel</b></sub>
+        </a>
+    </td>
 		</tr>
 	</tbody>
 </table>
