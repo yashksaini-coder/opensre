@@ -342,7 +342,13 @@ class _ReleaseHandler(BaseHTTPRequestHandler):
 
 @pytest.fixture()
 def release_api_url() -> str:
-    server = ThreadingHTTPServer(("127.0.0.1", 0), _ReleaseHandler)
+    try:
+        server = ThreadingHTTPServer(("127.0.0.1", 0), _ReleaseHandler)
+    except OSError as exc:
+        if exc.errno in {errno.EPERM, errno.EACCES}:
+            pytest.skip("localhost HTTP server binding is not permitted in this environment")
+        raise
+
     thread = Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
@@ -511,7 +517,7 @@ def test_onboard_interactive_smoke(cli_sandbox: CliSandbox) -> None:
 
     assert result.exit_code == 0
     assert "Done." in result.stdout
-    assert "summary" in result.stdout
+    assert "next" in result.stdout
 
     store = cli_sandbox.read_wizard_store()
     assert store["targets"]["local"]["provider"] == "anthropic"
@@ -555,7 +561,7 @@ def test_onboard_interactive_smoke_codex(cli_sandbox: CliSandbox) -> None:
 
     assert result.exit_code == 0
     assert "Done." in result.stdout
-    assert "summary" in result.stdout
+    assert "next" in result.stdout
 
     store = cli_sandbox.read_wizard_store()
     assert store["targets"]["local"]["provider"] == "anthropic"

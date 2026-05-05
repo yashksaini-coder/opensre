@@ -1256,6 +1256,27 @@ Thanks goes to these amazing people:
             <sub><b>aksKrIITK</b></sub>
         </a>
     </td>
+            <td align="center">
+        <a href="https://github.com/zerone0x">
+            <img src="https://avatars.githubusercontent.com/u/39543393?v=4" width="100" alt="zerone0x"/>
+            <br />
+            <sub><b>zerone0x</b></sub>
+        </a>
+    </td>
+            <td align="center">
+        <a href="https://github.com/Powlisher">
+            <img src="https://avatars.githubusercontent.com/u/200061014?v=4" width="100" alt="Powlisher"/>
+            <br />
+            <sub><b>Powlisher</b></sub>
+        </a>
+    </td>
+            <td align="center">
+        <a href="https://github.com/vidhishah2209">
+            <img src="https://avatars.githubusercontent.com/u/179381557?v=4" width="100" alt="vidhishah2209"/>
+            <br />
+            <sub><b>vidhishah2209</b></sub>
+        </a>
+    </td>
 		</tr>
 	</tbody>
 </table>
