@@ -92,9 +92,17 @@ def _check_integrations() -> tuple[bool, str]:
 
 def _check_version_freshness() -> tuple[bool, str]:
     current = get_version()
-    try:
-        from app.cli.support.update import _fetch_latest_version, _is_update_available
+    from app.cli.support.update import (
+        _fetch_latest_version,
+        _is_update_available,
+        development_install_doctor_version_detail,
+    )
 
+    dev_detail = development_install_doctor_version_detail(current)
+    if dev_detail is not None:
+        return True, dev_detail
+
+    try:
         latest = _fetch_latest_version()
         if _is_update_available(current, latest):
             return False, f"current={current}, latest={latest} — run 'opensre update'"
