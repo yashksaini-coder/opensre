@@ -5,6 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import click
 import pytest
 
 from app.analytics import provider
@@ -91,6 +92,7 @@ def test_main_does_not_capture_analytics_for_help(monkeypatch, capsys) -> None:
 
 def test_main_does_not_capture_analytics_for_parse_error(monkeypatch, capsys) -> None:
     captured: list[str] = []
+    captured_errors: list[BaseException] = []
     monkeypatch.setattr(
         "app.cli.__main__.capture_first_run_if_needed", lambda: captured.append("install")
     )
@@ -98,12 +100,36 @@ def test_main_does_not_capture_analytics_for_parse_error(monkeypatch, capsys) ->
         "app.cli.__main__.capture_cli_invoked", lambda *_args: captured.append("cli")
     )
     monkeypatch.setattr("app.cli.__main__.shutdown_analytics", lambda **_kw: None)
+    monkeypatch.setattr("app.cli.__main__.capture_exception", captured_errors.append)
 
     exit_code = main(["not-a-command"])
 
     assert exit_code != 0
     assert "No such command" in capsys.readouterr().err
     assert captured == []
+    assert len(captured_errors) == 1
+    assert isinstance(captured_errors[0], click.ClickException)
+
+
+def test_main_captures_invalid_option_parse_error(monkeypatch, capsys) -> None:
+    captured: list[str] = []
+    captured_errors: list[BaseException] = []
+    monkeypatch.setattr(
+        "app.cli.__main__.capture_first_run_if_needed", lambda: captured.append("install")
+    )
+    monkeypatch.setattr(
+        "app.cli.__main__.capture_cli_invoked", lambda *_args: captured.append("cli")
+    )
+    monkeypatch.setattr("app.cli.__main__.shutdown_analytics", lambda **_kw: None)
+    monkeypatch.setattr("app.cli.__main__.capture_exception", captured_errors.append)
+
+    exit_code = main(["--definitely-wrong-option"])
+
+    assert exit_code == 2
+    assert "No such option: --definitely-wrong-option" in capsys.readouterr().err
+    assert captured == []
+    assert len(captured_errors) == 1
+    assert isinstance(captured_errors[0], click.ClickException)
 
 
 def test_main_captures_analytics_once_for_accepted_command(monkeypatch, capsys) -> None:

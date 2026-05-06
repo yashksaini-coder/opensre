@@ -25,7 +25,7 @@ from app.cli.support.prompt_support import (
     install_questionary_ctrl_c_double_exit,
     install_questionary_escape_cancel,
 )
-from app.utils.sentry_sdk import init_sentry
+from app.utils.sentry_sdk import capture_exception, init_sentry
 from app.version import get_version
 
 _CAPTURE_CLI_ANALYTICS = "capture_cli_analytics"
@@ -194,7 +194,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         cli(
             args=cli_argv,
-            standalone_mode=True,
+            standalone_mode=False,
             obj={_CAPTURE_CLI_ANALYTICS: True, _CLI_ARGV: cli_argv},
         )
     except KeyboardInterrupt:
@@ -204,6 +204,12 @@ def main(argv: list[str] | None = None) -> int:
         # exit quietly — Click's "Aborted!" message is intentionally suppressed.
         print(flush=True)
         return 0
+    except click.ClickException as exc:
+        capture_exception(exc)
+        exc.show()
+        return exc.exit_code
+    except click.exceptions.Exit as exc:
+        return exc.exit_code
     except SystemExit as exc:
         if isinstance(exc.code, int):
             return exc.code
