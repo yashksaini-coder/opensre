@@ -1323,6 +1323,13 @@ Thanks goes to these amazing people:
             <sub><b>rudra496</b></sub>
         </a>
     </td>
+            <td align="center">
+        <a href="https://github.com/YauhenBichel">
+            <img src="https://avatars.githubusercontent.com/u/5603242?v=4" width="100" alt="YauhenBichel"/>
+            <br />
+            <sub><b>YauhenBichel</b></sub>
+        </a>
+    </td>
 		</tr>
 	</tbody>
 </table>
