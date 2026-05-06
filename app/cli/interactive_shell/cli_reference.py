@@ -56,7 +56,7 @@ def _interactive_shell_slash_hints() -> str:
         [
             "",
             "Non-interactive investigation: `opensre investigate` with stdin, file, or flags.",
-            "Launch only the interactive shell: `opensre agent` (requires a TTY).",
+            "Launch the interactive shell: `opensre` (requires a TTY).",
         ]
     )
     return "\n".join(lines)

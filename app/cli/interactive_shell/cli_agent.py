@@ -23,7 +23,7 @@ type _GroundingMode = Literal["reference_only", "conversational"]
 # jargon to the user (#604).
 _TERMINOLOGY_RULE = (
     "Terminology: always call this surface the 'interactive shell' (the "
-    "OpenSRE interactive terminal launched via `opensre` or `opensre agent`). "
+    "OpenSRE interactive terminal launched via `opensre`). "
     "Never use the word 'REPL' in user-facing answers - it is internal jargon."
 )
 
