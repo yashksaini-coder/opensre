@@ -19,14 +19,14 @@ from dotenv import load_dotenv
 from app.analytics.cli import build_cli_invoked_properties, capture_cli_invoked
 from app.analytics.provider import Properties, capture_first_run_if_needed, shutdown_analytics
 from app.cli.commands import register_commands
-from app.cli.support.errors import OpenSREError
+from app.cli.support.exception_reporting import report_exception, should_report_exception
 from app.cli.support.layout import RichGroup, render_landing
 from app.cli.support.prompt_support import (
     handle_ctrl_c_press,
     install_questionary_ctrl_c_double_exit,
     install_questionary_escape_cancel,
 )
-from app.utils.sentry_sdk import capture_exception, init_sentry
+from app.utils.sentry_sdk import init_sentry
 from app.version import get_version
 
 _CAPTURE_CLI_ANALYTICS = "capture_cli_analytics"
@@ -190,9 +190,7 @@ def _is_update_invocation(argv: list[str]) -> bool:
 
 def _should_capture_cli_exception(exc: click.ClickException) -> bool:
     """Return whether a Click error represents an unexpected internal failure."""
-    if isinstance(exc, click.UsageError) and str(exc).startswith("No such command "):
-        return True
-    return not isinstance(exc, (click.UsageError, OpenSREError))
+    return should_report_exception(exc)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -223,7 +221,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     except click.ClickException as exc:
         if _should_capture_cli_exception(exc):
-            capture_exception(exc)
+            report_exception(exc, context="cli.main")
         exc.show()
         return exc.exit_code
     except click.exceptions.Exit as exc:

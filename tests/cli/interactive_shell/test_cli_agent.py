@@ -206,6 +206,8 @@ class TestAssistantOutputRendering:
         assert session.cli_agent_messages[-1] == ("assistant", "First line\nSecond line")
 
     def test_llm_failure_prints_red_error_and_does_not_record(self, monkeypatch: Any) -> None:
+        captured_errors: list[BaseException] = []
+
         class _Boom:
             def invoke_stream(self, prompt: str) -> Iterator[str]:  # noqa: ARG002
                 raise RuntimeError("upstream 503")
@@ -214,12 +216,18 @@ class TestAssistantOutputRendering:
         import app.services.llm_client as llm_module
 
         monkeypatch.setattr(llm_module, "get_llm_for_reasoning", lambda: _Boom())
+        monkeypatch.setattr(
+            "app.cli.support.exception_reporting.capture_exception",
+            lambda exc, **_kwargs: captured_errors.append(exc),
+        )
         session = ReplSession()
         console, buf = _capture()
         answer_cli_agent("hi", session, console)
         output = _strip_ansi(buf.getvalue())
         assert "assistant failed" in output
         assert "upstream 503" in output
+        assert len(captured_errors) == 1
+        assert isinstance(captured_errors[0], RuntimeError)
         # On failure the turn must NOT be appended to the cli-agent history,
         # otherwise the next turn's prompt would carry a phantom assistant
         # message.

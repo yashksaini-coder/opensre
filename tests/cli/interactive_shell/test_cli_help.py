@@ -170,6 +170,8 @@ class TestAnswerCliHelp:
         self,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
+        captured_errors: list[BaseException] = []
+
         class _Boom:
             def invoke_stream(self, prompt: str) -> Iterator[str]:  # noqa: ARG002
                 raise RuntimeError("upstream 503")
@@ -178,12 +180,18 @@ class TestAnswerCliHelp:
         import app.services.llm_client as llm_module
 
         monkeypatch.setattr(llm_module, "get_llm_for_reasoning", lambda: _Boom())
+        monkeypatch.setattr(
+            "app.cli.support.exception_reporting.capture_exception",
+            lambda exc, **_kwargs: captured_errors.append(exc),
+        )
 
         console, buf = _capture()
         answer_cli_help("how do I deploy?", ReplSession(), console)
         output = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", buf.getvalue())
         assert "assistant failed" in output
         assert "upstream 503" in output
+        assert len(captured_errors) == 1
+        assert isinstance(captured_errors[0], RuntimeError)
 
     def test_response_uses_invoke_stream_not_invoke(
         self,

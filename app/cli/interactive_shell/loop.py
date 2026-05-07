@@ -41,6 +41,7 @@ from app.cli.interactive_shell.theme import (
     TERMINAL_ERROR,
 )
 from app.cli.support.errors import OpenSREError
+from app.cli.support.exception_reporting import report_exception
 from app.cli.support.prompt_support import repl_prompt_note_ctrl_c, repl_reset_ctrl_c_gate
 
 
@@ -331,6 +332,7 @@ def _run_new_alert(
         return
     except Exception as exc:  # noqa: BLE001
         task.mark_failed(str(exc))
+        report_exception(exc, context="interactive_shell.new_alert")
         # Exception repr may contain brackets (stack frame refs, config
         # dicts) that Rich would eat as markup tags — escape before printing.
         console.print(f"[{TERMINAL_ERROR}]investigation failed:[/] {escape(str(exc))}")
@@ -375,6 +377,7 @@ async def _run_one_turn(
         try:
             should_continue = dispatch_slash(cmd_text, session, console)
         except Exception as exc:  # noqa: BLE001
+            report_exception(exc, context="interactive_shell.slash_dispatch")
             console.print(
                 f"[{TERMINAL_ERROR}]command error:[/] {escape(str(exc))}"
                 " [dim](the REPL is still running)[/dim]"

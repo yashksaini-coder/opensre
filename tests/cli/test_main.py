@@ -80,7 +80,10 @@ def test_main_does_not_capture_expected_usage_errors_to_sentry(
     monkeypatch.setattr("app.cli.__main__.capture_first_run_if_needed", lambda: None)
     monkeypatch.setattr("app.cli.__main__.shutdown_analytics", lambda **_kw: None)
     monkeypatch.setattr("app.cli.__main__.capture_cli_invoked", lambda *_args: None)
-    monkeypatch.setattr("app.cli.__main__.capture_exception", captured.append)
+    monkeypatch.setattr(
+        "app.cli.support.exception_reporting.capture_exception",
+        lambda exc, **_kwargs: captured.append(exc),
+    )
 
     exit_code = main(["integrations", "show", "nonexistent"])
 
@@ -145,7 +148,10 @@ def test_main_captures_unknown_command_to_sentry(monkeypatch, capsys) -> None:
         "app.cli.__main__.capture_cli_invoked", lambda *_args: captured.append("cli")
     )
     monkeypatch.setattr("app.cli.__main__.shutdown_analytics", lambda **_kw: None)
-    monkeypatch.setattr("app.cli.__main__.capture_exception", captured_errors.append)
+    monkeypatch.setattr(
+        "app.cli.support.exception_reporting.capture_exception",
+        lambda exc, **_kwargs: captured_errors.append(exc),
+    )
 
     exit_code = main(["not-a-command"])
 
@@ -167,7 +173,10 @@ def test_main_does_not_capture_invalid_option_parse_error(monkeypatch, capsys) -
         "app.cli.__main__.capture_cli_invoked", lambda *_args: captured.append("cli")
     )
     monkeypatch.setattr("app.cli.__main__.shutdown_analytics", lambda **_kw: None)
-    monkeypatch.setattr("app.cli.__main__.capture_exception", captured_errors.append)
+    monkeypatch.setattr(
+        "app.cli.support.exception_reporting.capture_exception",
+        lambda exc, **_kwargs: captured_errors.append(exc),
+    )
 
     exit_code = main(["--definitely-wrong-option"])
 
