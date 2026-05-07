@@ -53,12 +53,6 @@ DEFAULT_OPENCLAW_MCP_COMMAND = "openclaw"
 DEFAULT_OPENCLAW_MCP_ARGS = ("mcp", "serve")
 DEFAULT_SENTRY_URL = "https://sentry.io"
 DEFAULT_GITLAB_BASE_URL = "https://gitlab.com/api/v4"
-_ASCII_HEADER = """\
-  ___  ____  _____ _   _ ____  ____  _____
- / _ \\|  _ \\| ____| \\ | / ___||  _ \\| ____|
-| | | | |_) |  _| |  \\| \\___ \\| |_) |  _|
-| |_| |  __/| |___| |\\  |___) |  _ <| |___
- \\___/|_|   |_____|_| \\_|____/|_| \\_\\_____|"""
 
 
 # Re-export build_demo_action_response from validation as a stable module-level

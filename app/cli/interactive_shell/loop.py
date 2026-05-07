@@ -18,21 +18,9 @@ from app.cli.interactive_shell.cli_help import answer_cli_help
 from app.cli.interactive_shell.commands import dispatch_slash
 from app.cli.interactive_shell.config import ReplConfig
 from app.cli.interactive_shell.follow_up import answer_follow_up
-
-# ``prompt_surface`` was extracted from this module; several names below are re-exported
-# so existing callers — notably the test suite, which imports them as ``loop.NAME`` —
-# keep working. The trailing F401 suppressions cover names not consumed inside this
-# file but still required as module attributes for those external references.
 from app.cli.interactive_shell.prompt_surface import (
-    _PROMPT_RULE_CHAR,  # noqa: F401
-    _SHIFT_ENTER_SEQUENCE,  # noqa: F401
-    ReplInputLexer,  # noqa: F401
-    ShellCompleter,  # noqa: F401
-    _build_prompt_key_bindings,  # noqa: F401
     _build_prompt_session,
-    _build_prompt_style,  # noqa: F401
     _prompt_message,
-    _tab_expand_or_menu,  # noqa: F401
     render_submitted_prompt,
 )
 from app.cli.interactive_shell.router import classify_input

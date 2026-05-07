@@ -242,6 +242,7 @@ def render_splash(console: Console | None = None, *, first_run: bool | None = No
                 console.print(f"  [{TEXT_DIM}]Press Enter to continue…[/]", end="")
                 sys.stdin.readline()
             except (EOFError, KeyboardInterrupt, OSError):
+                # Non-interactive stdin or user abort — skip blocking and continue startup.
                 pass
         console.print()
 
