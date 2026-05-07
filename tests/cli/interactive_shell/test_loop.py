@@ -13,11 +13,14 @@ from prompt_toolkit.completion import CompleteEvent
 from prompt_toolkit.document import Document
 from prompt_toolkit.history import FileHistory, InMemoryHistory
 from prompt_toolkit.input import DummyInput
+from prompt_toolkit.input.defaults import create_pipe_input
 from prompt_toolkit.keys import Keys
+from prompt_toolkit.layout.containers import Window
 from prompt_toolkit.output import DummyOutput
 
 from app.cli.interactive_shell import loop
 from app.cli.interactive_shell.session import ReplSession
+from app.cli.interactive_shell.theme import ANSI_RESET, PROMPT_ACCENT_ANSI, PROMPT_FRAME_ANSI
 
 
 def test_repl_input_lexer_highlights_first_slash_token() -> None:
@@ -52,6 +55,14 @@ def test_build_prompt_session_uses_persistent_history(
     assert prompt.history.filename == str(tmp_path / "interactive_history")
     assert tmp_path.exists()
     assert isinstance(prompt.completer, loop.ShellCompleter)
+    assert prompt.multiline is True
+    assert prompt.reserve_space_for_menu == 0
+    main = prompt.layout.container.children[0].alternative_content
+    assert main.content.children[1].content.dont_extend_height() is True
+    assert main.content.children[2].content.dont_extend_height() is True
+    bottom_rule = main.content.children[-1]
+    assert isinstance(bottom_rule, Window)
+    assert bottom_rule.char == loop._PROMPT_RULE_CHAR
     assert prompt.app.key_bindings is not None
 
 
@@ -69,6 +80,38 @@ def test_build_prompt_session_falls_back_to_memory_history(
         prompt = loop._build_prompt_session()
 
     assert isinstance(prompt.history, InMemoryHistory)
+
+
+def test_prompt_message_uses_themed_rule_line() -> None:
+    rendered = loop._prompt_message(ReplSession()).value.splitlines()
+
+    assert rendered[0].startswith(PROMPT_FRAME_ANSI)
+    assert rendered[0].endswith(ANSI_RESET)
+    assert loop._PROMPT_RULE_CHAR in rendered[0]
+    assert rendered[1].startswith(PROMPT_ACCENT_ANSI)
+
+
+def test_shift_enter_inserts_newline_before_submit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import app.constants as const_module
+
+    monkeypatch.setattr(const_module, "OPENSRE_HOME_DIR", tmp_path)
+
+    async def _collect() -> str:
+        with (
+            create_pipe_input() as pipe_input,
+            create_app_session(input=pipe_input, output=DummyOutput()),
+        ):
+            prompt = loop._build_prompt_session()
+            task = asyncio.create_task(prompt.prompt_async(""))
+            pipe_input.send_bytes(b"first line")
+            pipe_input.send_bytes(loop._SHIFT_ENTER_SEQUENCE.encode())
+            pipe_input.send_bytes(b"second line\r")
+            return await asyncio.wait_for(task, timeout=1)
+
+    assert asyncio.run(_collect()) == "first line\nsecond line"
 
 
 def test_shell_completer_previews_all_commands() -> None:
@@ -161,6 +204,7 @@ def test_completion_includes_tab_navigation() -> None:
     key_bindings = loop._build_prompt_key_bindings()
     keys = {binding.keys for binding in key_bindings.bindings}
 
+    assert (Keys.ControlM,) in keys
     assert (Keys.Down,) in keys
     assert (Keys.Up,) in keys
     assert (Keys.Tab,) in keys

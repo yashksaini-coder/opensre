@@ -7,12 +7,14 @@ import sys
 from collections.abc import Callable, Iterable
 
 from prompt_toolkit import PromptSession
+from prompt_toolkit.application.current import get_app
 from prompt_toolkit.buffer import Buffer
 from prompt_toolkit.completion import CompleteEvent, Completer, Completion, PathCompleter
 from prompt_toolkit.document import Document
-from prompt_toolkit.filters import has_completions
+from prompt_toolkit.filters import has_completions, to_filter
 from prompt_toolkit.formatted_text import ANSI, StyleAndTextTuples
 from prompt_toolkit.key_binding import KeyBindings
+from prompt_toolkit.layout.containers import HSplit, Window
 from prompt_toolkit.lexers import Lexer
 from prompt_toolkit.styles import Style
 from rich.console import Console
@@ -36,13 +38,63 @@ from app.cli.interactive_shell.theme import (
     OPENCLAW_AMBER,
     OPENCLAW_CORAL,
     OPENCLAW_ORANGE,
+    PRIMARY,
     PROMPT_ACCENT_ANSI,
+    PROMPT_FRAME_ANSI,
     SEPARATOR_COLOR,
     TERMINAL_ERROR,
 )
 from app.cli.support.errors import OpenSREError
 from app.cli.support.exception_reporting import report_exception
 from app.cli.support.prompt_support import repl_prompt_note_ctrl_c, repl_reset_ctrl_c_gate
+
+_PROMPT_RULE_CHAR = "─"
+_SHIFT_ENTER_SEQUENCE = "\x1b[27;2;13~"
+
+
+def _prompt_rule_line(width: int) -> str:
+    return _PROMPT_RULE_CHAR * max(width, 1)
+
+
+def _prompt_rule_ansi() -> str:
+    try:
+        width = get_app().output.get_size().columns
+    except Exception:  # noqa: BLE001
+        width = 80
+    return f"{PROMPT_FRAME_ANSI}{_prompt_rule_line(width)}{ANSI_RESET}"
+
+
+def _prompt_message(session: ReplSession) -> ANSI:
+    """Prompt message with a horizontal rule above the cursor line."""
+    prompt_line = _prompt_line_ansi(session).value
+    return ANSI(f"{_prompt_rule_ansi()}\n{prompt_line}")
+
+
+def _install_prompt_frame(session: PromptSession[str]) -> PromptSession[str]:
+    """Add a full-width divider directly below the prompt buffer."""
+    # ``session.layout.container`` is typed as the abstract ``Container`` base, which
+    # doesn't expose ``children`` — only concrete subclasses (e.g. ``FloatContainer``)
+    # do. Reach for it via ``getattr`` so the type checker stays happy.
+    children = getattr(session.layout.container, "children", None)
+    if not children:
+        return session
+    main_container = getattr(children[0], "alternative_content", None)
+    content = getattr(main_container, "content", None)
+    if not isinstance(content, HSplit):
+        return session
+    for child in content.children:
+        window = getattr(child, "content", None)
+        if isinstance(window, Window):
+            window.dont_extend_height = to_filter(True)
+    content.children.append(
+        Window(
+            height=1,
+            char=_PROMPT_RULE_CHAR,
+            dont_extend_height=True,
+            style="class:prompt-frame-line",
+        )
+    )
+    return session
 
 
 class ReplInputLexer(Lexer):
@@ -229,19 +281,29 @@ def _tab_expand_or_menu(buffer: Buffer) -> None:
 
 
 def _build_prompt_session() -> PromptSession[str]:
-    return PromptSession(
-        completer=ShellCompleter(),
-        complete_while_typing=True,
-        reserve_space_for_menu=8,
-        history=load_prompt_history(),
-        lexer=ReplInputLexer(),
-        key_bindings=_build_prompt_key_bindings(),
-        style=_build_prompt_style(),
+    return _install_prompt_frame(
+        PromptSession(
+            completer=ShellCompleter(),
+            complete_while_typing=True,
+            multiline=True,
+            reserve_space_for_menu=0,
+            history=load_prompt_history(),
+            lexer=ReplInputLexer(),
+            key_bindings=_build_prompt_key_bindings(),
+            style=_build_prompt_style(),
+        )
     )
 
 
 def _build_prompt_key_bindings() -> KeyBindings:
     bindings = KeyBindings()
+
+    @bindings.add("c-m")
+    def _accept_turn(event: object) -> None:
+        if event.data == _SHIFT_ENTER_SEQUENCE:  # type: ignore[attr-defined]
+            event.current_buffer.newline(copy_margin=False)  # type: ignore[attr-defined]
+            return
+        event.current_buffer.validate_and_handle()  # type: ignore[attr-defined]
 
     @bindings.add("tab")
     def _tab_complete(event: object) -> None:
@@ -269,6 +331,7 @@ def _build_prompt_key_bindings() -> KeyBindings:
 def _build_prompt_style() -> Style:
     return Style.from_dict(
         {
+            "prompt-frame-line": f"bold {PRIMARY}",
             "repl-slash-command": f"bold {OPENCLAW_AMBER} bg:#2c1e14",
             "completion-menu": "bg:#1c1917",
             "completion-menu.completion": "#d6d0ca bg:#1c1917",
@@ -354,7 +417,7 @@ async def _run_one_turn(
     """Read one line of input and dispatch. Returns False to exit."""
     while True:
         try:
-            text = await prompt.prompt_async(_prompt_line_ansi(session))
+            text = await prompt.prompt_async(lambda: _prompt_message(session))
         except EOFError:
             console.print()
             return False
@@ -383,7 +446,6 @@ async def _run_one_turn(
                 " [dim](the REPL is still running)[/dim]"
             )
             should_continue = True
-        console.print()
         return should_continue
 
     if kind == "cli_help":
