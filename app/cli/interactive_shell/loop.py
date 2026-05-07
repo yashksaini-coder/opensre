@@ -40,6 +40,7 @@ from app.cli.interactive_shell.theme import (
     TERMINAL_ERROR,
 )
 from app.cli.support.errors import OpenSREError
+from app.cli.support.prompt_support import repl_prompt_note_ctrl_c, repl_reset_ctrl_c_gate
 
 
 class ReplInputLexer(Lexer):
@@ -348,11 +349,19 @@ async def _run_one_turn(
     console: Console,
 ) -> bool:
     """Read one line of input and dispatch. Returns False to exit."""
-    try:
-        text = await prompt.prompt_async(_prompt_line_ansi(session))
-    except (EOFError, KeyboardInterrupt):
-        console.print()
-        return False
+    while True:
+        try:
+            text = await prompt.prompt_async(_prompt_line_ansi(session))
+        except EOFError:
+            console.print()
+            return False
+        except KeyboardInterrupt:
+            if repl_prompt_note_ctrl_c(console):
+                return False
+            continue
+
+        repl_reset_ctrl_c_gate()
+        break
 
     text = text.strip()
     if not text:
