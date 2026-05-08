@@ -1,8 +1,8 @@
 """Slash command: ``/agents`` (registered local AI agent fleet view).
 
 Bare ``/agents`` renders the registered-agents dashboard; subcommands
-drill into specific surfaces (``budget``, ``conflicts``, with more
-landing as the monitor-local-agents initiative ships).
+drill into specific surfaces (currently ``budget``, ``claim``, ``conflicts``,
+``release``, with more landing as the monitor-local-agents initiative ships).
 """
 
 from __future__ import annotations
@@ -26,21 +26,36 @@ from app.agents.conflicts import (
     detect_conflicts,
     render_conflicts,
 )
+from app.agents.coordination import BranchClaims
 from app.agents.registry import AgentRegistry
 from app.cli.interactive_shell.agents_view import render_agents_table
 from app.cli.interactive_shell.command_registry.types import SlashCommand
 from app.cli.interactive_shell.rendering import repl_table
 from app.cli.interactive_shell.session import ReplSession
-from app.cli.interactive_shell.theme import BOLD_BRAND, DIM, ERROR
+from app.cli.interactive_shell.theme import BOLD_BRAND, DIM, ERROR, HIGHLIGHT
 
 _AGENTS_FIRST_ARGS: tuple[tuple[str, str], ...] = (
     ("budget", "view or edit per-agent hourly budgets"),
+    ("claim", "claim a branch for an agent"),
     ("conflicts", "show file-write conflicts between local AI agents"),
+    ("release", "release a branch claim"),
 )
 
 
 def _opensre_agent_id() -> str:
     return f"opensre:{os.getpid()}"
+
+
+def _display_path(path: Path) -> str:
+    """Replace the user's home prefix with ``~`` for cleaner CLI output."""
+    try:
+        return f"~/{path.relative_to(Path.home())}"
+    except ValueError:
+        return str(path)
+
+
+def _print_config_error(console: Console, exc: ValidationError) -> None:
+    console.print(f"[{ERROR}]agents.yaml has invalid contents:[/] {escape(str(exc))}")
 
 
 def _cmd_agents_list(console: Console) -> bool:
@@ -72,24 +87,83 @@ def _cmd_agents_conflicts(console: Console) -> bool:
     return True
 
 
-def _display_path(path: Path) -> str:
-    """Replace the user's home prefix with ``~`` for cleaner CLI output."""
-    try:
-        return f"~/{path.relative_to(Path.home())}"
-    except ValueError:
-        return str(path)
+def _cmd_agents_claim(session: ReplSession, console: Console, args: list[str]) -> bool:
+    """Handle /agents claim <branch> <agent-name>."""
+    if len(args) < 2:
+        console.print(f"[{ERROR}]Usage:[/] /agents claim <branch> <agent-name>")
+        session.mark_latest(ok=False, kind="slash")
+        return False
+
+    branch = args[0].strip()
+    agent_name = args[1].strip()
+
+    # Look up the PID from the registry for the given agent name
+    registry = AgentRegistry()
+    pid = None
+    for record in registry.list():
+        if record.name == agent_name:
+            pid = record.pid
+            break
+
+    if pid is None:
+        console.print(
+            f"[{ERROR}]Agent '{escape(agent_name)}' not found in registry. "
+            "Use /agents to see registered agents."
+        )
+        session.mark_latest(ok=False, kind="slash")
+        return False
+
+    claims = BranchClaims()
+    claim = claims.claim(branch, agent_name, pid)
+
+    if claim is None:
+        existing = claims.get(branch)
+        assert existing is not None  # claim() only returns None when branch is held
+        console.print(
+            f"[{ERROR}]Cannot claim:[/] {escape(branch)} is already held by "
+            f"{escape(existing.agent_name)} (pid {existing.pid}). "
+            "Use /agents release first."
+        )
+        session.mark_latest(ok=False, kind="slash")
+        return False
+
+    console.print(
+        f"[{HIGHLIGHT}]Branch {escape(branch)} now held by {escape(agent_name)} (pid {pid}).[/]"
+    )
+    return True
 
 
-def _print_config_error(console: Console, exc: ValidationError) -> None:
-    console.print(f"[{ERROR}]agents.yaml has invalid contents:[/] {escape(str(exc))}")
+def _cmd_agents_release(session: ReplSession, console: Console, args: list[str]) -> bool:
+    """Handle /agents release <branch>."""
+    if len(args) < 1:
+        console.print(f"[{ERROR}]Usage:[/] /agents release <branch>")
+        session.mark_latest(ok=False, kind="slash")
+        return False
+
+    branch = args[0].strip()
+    claims = BranchClaims()
+
+    existing = claims.get(branch)
+    if existing is None:
+        console.print(f"[{ERROR}]{escape(branch)} is not currently held by any agent.")
+        session.mark_latest(ok=False, kind="slash")
+        return False
+
+    # release() cannot return None here because we confirmed existing is not None above
+    removed = claims.release(branch)
+    assert removed is not None
+    console.print(
+        f"[{HIGHLIGHT}]Released {escape(branch)} (was held by {escape(removed.agent_name)}).[/]"
+    )
+    return True
 
 
 def _cmd_agents_budget(session: ReplSession, console: Console, args: list[str]) -> bool:
     """View or edit per-agent budgets stored in ``~/.config/opensre/agents.yaml``.
 
-    No args → render the current budgets as a table. Two args
-    (``<agent> <usd>``) → set ``hourly_budget_usd`` for that agent and
-    persist. Anything else → usage hint.
+    No args -> render the current budgets as a table. Two args
+    (``<agent> <usd>``) -> set ``hourly_budget_usd`` for that agent and
+    persist. Anything else -> usage hint.
     """
     if not args:
         try:
@@ -151,7 +225,7 @@ def _cmd_agents_budget(session: ReplSession, console: Console, args: list[str]) 
         return True
 
     console.print(
-        f"updated [bold]{escape(name)}[/]: ${usd:.2f}/hr → {_display_path(agents_config_path())}"
+        f"updated [bold]{escape(name)}[/]: ${usd:.2f}/hr -> {_display_path(agents_config_path())}"
     )
     return True
 
@@ -167,10 +241,16 @@ def _cmd_agents(session: ReplSession, console: Console, args: list[str]) -> bool
     if sub == "conflicts":
         return _cmd_agents_conflicts(console)
 
+    if sub == "claim":
+        return _cmd_agents_claim(session, console, args[1:])
+
+    if sub == "release":
+        return _cmd_agents_release(session, console, args[1:])
+
     console.print(
         f"[{ERROR}]unknown subcommand:[/] {escape(sub)}  "
         "(try [bold]/agents[/bold], [bold]/agents budget[/bold], "
-        "or [bold]/agents conflicts[/bold])"
+        "[bold]/agents conflicts[/bold], [bold]/agents claim[/bold], or [bold]/agents release[/bold])"
     )
     session.mark_latest(ok=False, kind="slash")
     return True
@@ -179,7 +259,7 @@ def _cmd_agents(session: ReplSession, console: Console, args: list[str]) -> bool
 COMMANDS: list[SlashCommand] = [
     SlashCommand(
         "/agents",
-        "show registered local AI agents (subcommands: budget, conflicts)",
+        "show registered local AI agents (subcommands: budget, claim, conflicts, release)",
         _cmd_agents,
         first_arg_completions=_AGENTS_FIRST_ARGS,
     ),
