@@ -7,6 +7,14 @@ on:
       - "docs/**"
       - "**/*.md"
       - "**/*.mdx"
+      - ".claude/**"
+      - "CLAUDE.md"
+      - "AGENTS.md"
+      - "SETUP.md"
+      - "README.md"
+      - "CONTRIBUTING.md"
+      - ".understand-anything/**"
+      - ".github/**"
   schedule:
     - cron: "30 0 * * *"
   workflow_dispatch:
