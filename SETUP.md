@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- **Python 3.12+** — required by [`pyproject.toml`](pyproject.toml) (`requires-python = ">=3.12"`). CI workflows use **Python 3.13** (see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)); [`.tool-versions`](.tool-versions) pins the same for local tooling managers.
+- **Python 3.12+** — required by [`pyproject.toml`](pyproject.toml) (`requires-python = ">=3.12"`). CI workflows use **Python 3.13** (see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)). [`.tool-versions`](.tool-versions) pins Python **3.13**, **uv**, **ruff**, and **mypy** (versions aligned with [`uv.lock`](uv.lock) where applicable) plus Node/pnpm for mise/asdf-style managers — optional; normal flows install **ruff** and **mypy** into `.venv` via **`make install`** / **`uv sync`**.
 - Git
 - **[uv](https://docs.astral.sh/uv/getting-started/installation/)** — required for `make install` (locked deps from `uv.lock`)
 - **Make** — standard on macOS/Linux; Windows options below
