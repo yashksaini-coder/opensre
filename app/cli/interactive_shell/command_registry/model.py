@@ -19,7 +19,7 @@ from app.cli.interactive_shell.repl_choice_menu import (
     repl_tty_interactive,
 )
 from app.cli.interactive_shell.session import ReplSession
-from app.cli.interactive_shell.theme import PRIMARY, TERMINAL_ERROR, TEXT_DIM, WARNING
+from app.cli.interactive_shell.theme import DIM, ERROR, HIGHLIGHT, WARNING
 
 _ROOT = "/model"  # breadcrumb root label
 
@@ -64,7 +64,7 @@ def switch_llm_provider(
     provider_key = provider_name.strip().lower()
     provider = PROVIDER_BY_VALUE.get(provider_key)
     if provider is None:
-        console.print(f"[{TERMINAL_ERROR}]unknown LLM provider:[/] {escape(provider_name)}")
+        console.print(f"[{ERROR}]unknown LLM provider:[/] {escape(provider_name)}")
         print_valid_choice_list(
             console,
             title="valid providers:",
@@ -87,24 +87,21 @@ def switch_llm_provider(
         and not has_llm_api_key(provider.api_key_env)
     ):
         console.print(
-            f"[{TERMINAL_ERROR}]missing credential for {provider.value}:[/] "
+            f"[{ERROR}]missing credential for {provider.value}:[/] "
             f"{provider.api_key_env} is not set in env or the keyring."
         )
         console.print(
-            f"[{TEXT_DIM}]set it with[/] [bold]export {provider.api_key_env}=<your-key>[/bold] "
-            f"[{TEXT_DIM}]or run[/] [bold]opensre onboard[/bold] "
-            f"[{TEXT_DIM}]to save it to the keyring, then rerun this command.[/]"
+            f"[{DIM}]set it with[/] [bold]export {provider.api_key_env}=<your-key>[/bold] "
+            f"[{DIM}]or run[/] [bold]opensre onboard[/bold] "
+            f"[{DIM}]to save it to the keyring, then rerun this command.[/]"
         )
         return False
 
     selected_model = model.strip() if model else provider.default_model
     if selected_model and not _is_model_supported(provider.value, selected_model, provider.models):
+        console.print(f"[{ERROR}]unknown model for {provider.value}:[/] {escape(selected_model)}")
         console.print(
-            f"[{TERMINAL_ERROR}]unknown model for {provider.value}:[/] {escape(selected_model)}"
-        )
-        console.print(
-            "[dim]known reasoning models:[/dim] "
-            f"{escape(_format_supported_models(provider.models))}"
+            f"[{DIM}]known reasoning models:[/] {escape(_format_supported_models(provider.models))}"
         )
         return False
 
@@ -124,11 +121,11 @@ def switch_llm_provider(
             if selected_toolcall:
                 if not _is_model_supported(provider.value, selected_toolcall, provider.models):
                     console.print(
-                        f"[{TERMINAL_ERROR}]unknown model for {provider.value}:[/] "
+                        f"[{ERROR}]unknown model for {provider.value}:[/] "
                         f"{escape(selected_toolcall)}"
                     )
                     console.print(
-                        "[dim]known toolcall models:[/dim] "
+                        f"[{DIM}]known toolcall models:[/] "
                         f"{escape(_format_supported_models(provider.models))}"
                     )
                     return False
@@ -139,17 +136,17 @@ def switch_llm_provider(
     _reset_runtime_llm_caches()
 
     # Be explicit about which slot each model lands in.
-    console.print(f"[{PRIMARY}]switched LLM provider:[/] {provider.value}")
+    console.print(f"[{HIGHLIGHT}]switched LLM provider:[/] {provider.value}")
     console.print(
-        f"[{PRIMARY}]reasoning model:[/] {selected_model or 'provider default'} "
-        f"[{TEXT_DIM}]({provider.model_env})[/]"
+        f"[{HIGHLIGHT}]reasoning model:[/] {selected_model or 'provider default'} "
+        f"[{DIM}]({provider.model_env})[/]"
     )
     if selected_toolcall:
         console.print(
-            f"[{PRIMARY}]toolcall model:[/] {selected_toolcall} "
-            f"[{TEXT_DIM}]({provider.toolcall_model_env})[/]"
+            f"[{HIGHLIGHT}]toolcall model:[/] {selected_toolcall} "
+            f"[{DIM}]({provider.toolcall_model_env})[/]"
         )
-    console.print(f"[{TEXT_DIM}]updated {env_path}[/]")
+    console.print(f"[{DIM}]updated {env_path}[/]")
     render_models_table(console, repl_data.load_llm_settings())
     return True
 
@@ -168,7 +165,7 @@ def switch_toolcall_model(
     resolved_name = (raw_name or "anthropic").strip().lower()
     provider = PROVIDER_BY_VALUE.get(resolved_name)
     if provider is None:
-        console.print(f"[{TERMINAL_ERROR}]unknown LLM provider:[/] {escape(resolved_name)}")
+        console.print(f"[{ERROR}]unknown LLM provider:[/] {escape(resolved_name)}")
         print_valid_choice_list(
             console,
             title="valid providers:",
@@ -183,7 +180,7 @@ def switch_toolcall_model(
         return False
     new_model = toolcall_model.strip()
     if not new_model:
-        console.print(f"[{TERMINAL_ERROR}]toolcall model cannot be empty[/]")
+        console.print(f"[{ERROR}]toolcall model cannot be empty[/]")
         return False
 
     values = {provider.toolcall_model_env: new_model}
@@ -192,10 +189,10 @@ def switch_toolcall_model(
     _reset_runtime_llm_caches()
 
     console.print(
-        f"[{PRIMARY}]toolcall model set to:[/] {new_model} "
-        f"[{TEXT_DIM}]({provider.value} · {provider.toolcall_model_env})[/]"
+        f"[{HIGHLIGHT}]toolcall model set to:[/] {new_model} "
+        f"[{DIM}]({provider.value} · {provider.toolcall_model_env})[/]"
     )
-    console.print(f"[{TEXT_DIM}]updated {env_path}[/]")
+    console.print(f"[{DIM}]updated {env_path}[/]")
     render_models_table(console, repl_data.load_llm_settings())
     return True
 
@@ -207,7 +204,7 @@ def restore_default_model(provider_name: str, console: Console) -> bool:
     provider_key = provider_name.strip().lower()
     provider = PROVIDER_BY_VALUE.get(provider_key)
     if provider is None:
-        console.print(f"[{TERMINAL_ERROR}]unknown LLM provider:[/] {escape(provider_name)}")
+        console.print(f"[{ERROR}]unknown LLM provider:[/] {escape(provider_name)}")
         print_valid_choice_list(
             console,
             title="valid providers:",
@@ -457,19 +454,19 @@ def _cmd_model(session: ReplSession, console: Console, args: list[str]) -> bool:
             return True
         if len(args) >= 2 and args[1].lower() in ("set", "use", "switch"):
             if len(args) < 3:
-                console.print(f"[{TEXT_DIM}]usage:[/] /model toolcall set <model>")
+                console.print(f"[{DIM}]usage:[/] /model toolcall set <model>")
                 return True
             switch_toolcall_model(args[2], console)
             return True
         console.print(
-            f"[{TEXT_DIM}]usage:[/] /model toolcall set <model> "
-            f"[{TEXT_DIM}](sets the toolcall model for the active provider)[/]"
+            f"[{DIM}]usage:[/] /model toolcall set <model> "
+            f"[{DIM}](sets the toolcall model for the active provider)[/]"
         )
         return True
 
     if sub in ("restore", "default", "reset"):
         if len(args) > 2:
-            console.print("[dim]usage:[/dim] /model restore [provider]")
+            console.print(f"[{DIM}]usage:[/] /model restore [provider]")
             session.mark_latest(ok=False, kind="slash")
             return True
         provider_name = args[1] if len(args) == 2 else os.getenv("LLM_PROVIDER", "anthropic")
@@ -483,10 +480,10 @@ def _cmd_model(session: ReplSession, console: Console, args: list[str]) -> bool:
             provider_name, reasoning_model, tc_model = parse_model_set_args(args[1:])
         except ValueError as exc:
             console.print()
-            console.print(f"[{TERMINAL_ERROR}]{escape(str(exc))}[/]")
+            console.print(f"[{ERROR}]{escape(str(exc))}[/]")
             console.print()
             console.print(
-                f"[{TEXT_DIM}]usage:[/] /model set <provider> [model] [--toolcall-model <model>]"
+                f"[{DIM}]usage:[/] /model set <provider> [model] [--toolcall-model <model>]"
             )
             session.mark_latest(ok=False, kind="slash")
             return True
@@ -501,7 +498,7 @@ def _cmd_model(session: ReplSession, console: Console, args: list[str]) -> bool:
         return True
 
     console.print(
-        f"[{TERMINAL_ERROR}]unknown subcommand:[/] {escape(sub)}  "
+        f"[{ERROR}]unknown subcommand:[/] {escape(sub)}  "
         "(try [bold]/model show[/bold], "
         "[bold]/model set <provider> [model] [--toolcall-model <m>][/bold], "
         "[bold]/model restore [provider][/bold], "

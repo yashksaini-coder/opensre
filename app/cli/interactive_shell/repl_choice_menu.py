@@ -20,11 +20,11 @@ from rich.markup import escape
 
 from app.cli.interactive_shell.theme import (
     ANSI_RESET,
-    BORDER,
+    DIM,
     DIM_COUNTER_ANSI,
     MENU_SELECTION_ROW_ANSI,
     PROMPT_ACCENT_ANSI,
-    TEXT_DIM,
+    SECONDARY,
 )
 
 _HINT = "↑↓  Enter  Esc"
@@ -41,7 +41,7 @@ def repl_tty_interactive() -> bool:
 def repl_section_break(console: Console) -> None:
     """Blank line + dim rule between an inline menu step and Rich output."""
     console.print()
-    console.rule(characters="─", style=f"dim {BORDER}")
+    console.rule(characters="─", style=DIM)
     console.print()
 
 
@@ -225,9 +225,9 @@ def print_valid_choice_list(
     """Print one choice per line for scan-friendly fallback/error messaging."""
     if not choices:
         return
-    console.print(f"[{TEXT_DIM}]{title}[/]")
+    console.print(f"[{SECONDARY}]{title}[/]")
     for choice in choices:
-        console.print(f"[{TEXT_DIM}]  - {escape(choice)}[/]")
+        console.print(f"[{SECONDARY}]  - {escape(choice)}[/]")
 
 
 __all__ = [
