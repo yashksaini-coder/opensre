@@ -1,9 +1,8 @@
 """Direct-SDK chat adapter for interactive chat models (issue #1363).
 
-Replaces the LangChain-backed ``chat_langchain_adapter`` with calls directly
-to the ``openai`` and ``anthropic`` SDKs.  The public surface — ``BoundChatModel``,
-``AssistantTurn``, ``build_bound_chat_model``, ``messages_to_invocation_dicts`` —
-is identical so ``app/nodes/chat.py`` requires zero changes.
+OpenAI / Anthropic SDK calls implement ``BoundChatModel``. Incoming graph-state
+messages are normalized to neutral dicts (``messages_to_invocation_dicts``), with
+duck-typing for legacy framework-shaped objects at the boundary (issue #1361).
 """
 
 from __future__ import annotations
@@ -72,7 +71,7 @@ def _anthropic_messages_create_with_retry(client: Any, kwargs: dict[str, Any]) -
     raise RuntimeError("Anthropic messages.create retry completed without return or raise")
 
 
-# ── Role mapping for legacy LC-typed messages in state ───────────────────────
+# ── Role mapping for graph messages that use legacy ``type`` / class names ────
 
 _LC_TYPE_TO_ROLE: dict[str, str] = {
     "human": "user",
@@ -81,23 +80,13 @@ _LC_TYPE_TO_ROLE: dict[str, str] = {
     "tool": "tool",
 }
 
-
-def _legacy_message_to_dict_without_langchain(msg: Any) -> dict[str, Any]:
-    """Map an LC-shaped message when ``langchain_core`` is unavailable."""
-    content = str(getattr(msg, "content", ""))
-    t = getattr(msg, "type", None)
-    if isinstance(t, str):
-        role = _LC_TYPE_TO_ROLE.get(t, "user")
-        return {"role": role, "content": content}
-    cn = type(msg).__name__
-    class_map = {
-        "AIMessage": "assistant",
-        "HumanMessage": "user",
-        "SystemMessage": "system",
-        "ToolMessage": "tool",
-    }
-    role = class_map.get(cn, "user")
-    return {"role": role, "content": content}
+_CLASS_NAME_TO_ROLE: dict[str, str] = {
+    "AIMessage": "assistant",
+    "AIMessageChunk": "assistant",
+    "HumanMessage": "user",
+    "SystemMessage": "system",
+    "ToolMessage": "tool",
+}
 
 
 # ── Tool schema builders ──────────────────────────────────────────────────────
@@ -133,11 +122,36 @@ def _anthropic_chat_tools() -> list[dict[str, Any]]:
 # ── Neutral message dict helpers ─────────────────────────────────────────────
 
 
+def _coerce_text_field(value: Any) -> str:
+    """Flatten message ``content`` for API payloads: ``None`` → ``\"\"``, never ``\"None\"``."""
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    return str(value)
+
+
 def normalize_graph_message_dict(m: dict[str, Any]) -> dict[str, Any]:
-    """Ensure a neutral dict has ``role`` (maps legacy LC ``type`` if needed)."""
+    """Ensure a neutral dict has ``role`` (maps legacy ``type`` if needed)."""
     out = dict(m)
     if "role" not in out and "type" in out:
         out["role"] = _LC_TYPE_TO_ROLE.get(str(out["type"]), "user")
+    return out
+
+
+def normalize_invocation_message_dict(m: dict[str, Any]) -> dict[str, Any]:
+    """Normalize a message dict so ``tool_calls`` are plain ``ToolCallPayload`` dicts."""
+    out = normalize_graph_message_dict(m)
+    tcs = out.get("tool_calls")
+    if tcs is None:
+        return out
+    neutral = _tool_calls_to_neutral(tcs)
+    if neutral:
+        out["tool_calls"] = list(neutral)
+    else:
+        # ``_tool_calls_to_neutral`` returns one entry per iterable item (no filtering),
+        # so emptiness implies ``tool_calls`` was effectively empty — keep ``[]``.
+        out["tool_calls"] = []
     return out
 
 
@@ -149,73 +163,67 @@ def _tool_calls_to_neutral(raw: Any) -> list[ToolCallPayload]:
             name = str(tc.get("name", ""))
             args = tc.get("args")
             if not isinstance(args, dict):
-                args = {}
+                alt = tc.get("arguments")
+                args = alt if isinstance(alt, dict) else {}
         else:
             tc_id = str(getattr(tc, "id", "") or "")
             name = str(getattr(tc, "name", "") or "")
             raw_args = getattr(tc, "args", None)
-            args = raw_args if isinstance(raw_args, dict) else {}
+            if isinstance(raw_args, dict):
+                args = raw_args
+            else:
+                alt = getattr(tc, "arguments", None)
+                args = alt if isinstance(alt, dict) else {}
         out.append(ToolCallPayload(id=tc_id, name=name, args=args))
     return out
 
 
-def lc_message_to_neutral_dict(msg: Any) -> dict[str, Any]:
-    """Convert a LangChain BaseMessage to a neutral role/content dict.
+def object_graph_message_to_neutral_dict(msg: Any) -> dict[str, Any]:
+    """Convert a non-dict graph message (e.g. framework message object) to a neutral dict.
 
-    Kept for the ``messages_to_invocation_dicts`` bridge until the LangGraph
-    state no longer contains ``BaseMessage`` objects (#1361 / #1365).
+    Uses duck-typing only — no LangChain imports — so chat stays decoupled from
+    message class implementations while older graph checkpoints can still load.
     """
-    try:
-        from langchain_core.messages import (
-            AIMessage,
-            BaseMessage,
-            HumanMessage,
-            SystemMessage,
-            ToolMessage,
-        )
-    except ImportError:
-        return _legacy_message_to_dict_without_langchain(msg)
+    type_attr = getattr(msg, "type", None)
+    cn = type(msg).__name__
 
-    if isinstance(msg, SystemMessage):
-        return {"role": "system", "content": str(msg.content)}
-    if isinstance(msg, HumanMessage):
-        return {"role": "user", "content": str(msg.content)}
-    if isinstance(msg, AIMessage):
-        out: dict[str, Any] = {"role": "assistant", "content": str(msg.content)}
-        tool_calls = _tool_calls_to_neutral(getattr(msg, "tool_calls", None))
-        if tool_calls:
-            out["tool_calls"] = list(tool_calls)
-        return out
-    if isinstance(msg, ToolMessage):
+    if isinstance(type_attr, str):
+        role = _LC_TYPE_TO_ROLE.get(type_attr, "user")
+    else:
+        role = _CLASS_NAME_TO_ROLE.get(cn, "user")
+
+    content = _coerce_text_field(getattr(msg, "content", ""))
+
+    if role == "tool" or cn == "ToolMessage":
         return {
             "role": "tool",
-            "content": str(msg.content),
-            "tool_call_id": str(msg.tool_call_id),
-            "name": str(msg.name),
+            "content": content,
+            "tool_call_id": str(getattr(msg, "tool_call_id", "") or ""),
+            "name": str(getattr(msg, "name", "") or ""),
         }
-    if isinstance(msg, BaseMessage):
-        t = getattr(msg, "type", None)
-        if isinstance(t, str):
-            role = _LC_TYPE_TO_ROLE.get(t, "user")
-        else:
-            role = "user"
-        return {"role": role, "content": str(getattr(msg, "content", ""))}
-    return _legacy_message_to_dict_without_langchain(msg)
+
+    if role == "assistant" or cn in ("AIMessage", "AIMessageChunk"):
+        out_assistant: dict[str, Any] = {"role": "assistant", "content": content}
+        tool_calls = _tool_calls_to_neutral(getattr(msg, "tool_calls", None))
+        if tool_calls:
+            out_assistant["tool_calls"] = list(tool_calls)
+        return out_assistant
+
+    return {"role": role, "content": content}
 
 
 def messages_to_invocation_dicts(msgs: list[Any]) -> list[dict[str, Any]]:
-    """Convert LangGraph ``messages`` reducer entries to neutral dicts.
+    """Convert LangGraph ``messages`` reducer entries to neutral invocation dicts.
 
-    Accepts both plain dicts (the new path) and ``BaseMessage`` objects still
-    present in LangGraph state until #1361 completes the message-schema migration.
+    Accepts plain dicts and duck-typed message objects (``type`` / ``content`` /
+    optional ``tool_calls`` / ``tool_call_id``) without importing framework types.
     """
     out: list[dict[str, Any]] = []
     for m in msgs:
         if isinstance(m, dict):
-            out.append(normalize_graph_message_dict(m))
+            out.append(normalize_invocation_message_dict(m))
         else:
-            # BaseMessage or any object with .content — delegate via lazy import
-            out.append(lc_message_to_neutral_dict(m))
+            out.append(object_graph_message_to_neutral_dict(m))
     return out
 
 
@@ -229,9 +237,7 @@ def _normalize_messages_for_openai(
     out: list[dict[str, Any]] = []
     for m in msgs:
         role = str(m.get("role", "user"))
-        content = m.get("content", "")
-        if not isinstance(content, str):
-            content = str(content)
+        content = _coerce_text_field(m.get("content"))
 
         if role == "tool":
             name = m.get("name")
@@ -292,6 +298,11 @@ class _OpenAIChatAdapter:
         return self._client
 
     def invoke(self, messages: list[Any]) -> AssistantTurn:
+        """Call OpenAI Chat Completions.
+
+        ``messages`` may be reducer entries or outputs of ``messages_to_invocation_dicts``;
+        normalization runs once (no-op shapes are cheap).
+        """
         dicts = messages_to_invocation_dicts(messages)
         normalized = _normalize_messages_for_openai(dicts)
 
@@ -352,13 +363,15 @@ def _split_system_messages(
     n = len(msgs)
     while i < n and str(msgs[i].get("role", "")) == "system":
         m = msgs[i]
-        content = m.get("content", "")
-        if isinstance(content, str):
-            system_parts.append(content)
-        elif isinstance(content, (dict, list)):
-            system_parts.append(json.dumps(content))
+        raw_content = m.get("content")
+        if raw_content is None:
+            system_parts.append("")
+        elif isinstance(raw_content, str):
+            system_parts.append(raw_content)
+        elif isinstance(raw_content, (dict, list)):
+            system_parts.append(json.dumps(raw_content))
         else:
-            system_parts.append(str(content))
+            system_parts.append(str(raw_content))
         i += 1
     rest = list(msgs[i:])
     return ("\n".join(system_parts) if system_parts else None, rest)
@@ -382,11 +395,11 @@ def _merge_consecutive_user_turns(
             if isinstance(prev_content, list) and isinstance(curr_content, list):
                 merged: Any = prev_content + curr_content
             elif isinstance(prev_content, list):
-                merged = prev_content + [{"type": "text", "text": str(curr_content)}]
+                merged = prev_content + [{"type": "text", "text": _coerce_text_field(curr_content)}]
             elif isinstance(curr_content, list):
-                merged = [{"type": "text", "text": str(prev_content)}] + curr_content
+                merged = [{"type": "text", "text": _coerce_text_field(prev_content)}] + curr_content
             else:
-                merged = f"{prev_content}\n\n{curr_content}"
+                merged = f"{_coerce_text_field(prev_content)}\n\n{_coerce_text_field(curr_content)}"
             out[-1] = {"role": "user", "content": merged}
         else:
             out.append(m)
@@ -416,17 +429,13 @@ def _normalize_messages_for_anthropic(
     while i < n:
         m = msgs[i]
         role = str(m.get("role", "user"))
-        content = m.get("content", "")
-        if not isinstance(content, str):
-            content = str(content)
+        content = _coerce_text_field(m.get("content"))
 
         if role == "tool":
             tool_blocks: list[dict[str, Any]] = []
             while i < n and str(msgs[i].get("role", "")) == "tool":
                 tm = msgs[i]
-                tc_content = tm.get("content", "")
-                if not isinstance(tc_content, str):
-                    tc_content = str(tc_content)
+                tc_content = _coerce_text_field(tm.get("content"))
                 tool_blocks.append(
                     {
                         "type": "tool_result",
@@ -523,6 +532,7 @@ class _AnthropicChatAdapter:
         return self._client
 
     def invoke(self, messages: list[Any]) -> AssistantTurn:
+        """Call Anthropic ``messages.create`` (same ``messages`` contract as OpenAI adapter)."""
         dicts = messages_to_invocation_dicts(messages)
         system, non_system = _split_system_messages(dicts)
         normalized = _normalize_messages_for_anthropic(non_system)
