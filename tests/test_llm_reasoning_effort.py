@@ -10,7 +10,10 @@ import pytest
 from app.llm_reasoning_effort import (
     ReasoningEffortChoice,
     apply_reasoning_effort,
+    describe_reasoning_effort_default,
+    display_reasoning_effort,
     get_active_reasoning_effort,
+    infer_reasoning_effort_default,
 )
 
 _ENV_KEY = "OPENSRE_REASONING_EFFORT"
@@ -61,3 +64,18 @@ def test_concurrent_threads_do_not_cross_session_overrides() -> None:
 
     assert observed[1] == "high"
     assert observed[2] == "low"
+
+
+def test_display_reasoning_effort_formats_default_in_parentheses() -> None:
+    assert display_reasoning_effort(None) == "(default)"
+
+
+def test_infer_reasoning_effort_default_for_openai_gpt_5_2() -> None:
+    assert infer_reasoning_effort_default("openai", "gpt-5.2") == "none"
+
+
+def test_describe_reasoning_effort_default_for_unsupported_provider() -> None:
+    assert (
+        describe_reasoning_effort_default("anthropic", "claude-opus-4-7")
+        == "anthropic does not use reasoning-effort overrides"
+    )

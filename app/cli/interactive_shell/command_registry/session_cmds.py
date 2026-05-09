@@ -8,7 +8,7 @@ from rich.console import Console
 from rich.markup import escape
 
 import app.cli.interactive_shell.command_registry.repl_data as repl_data
-from app.cli.interactive_shell.banner import render_banner
+from app.cli.interactive_shell.banner import render_banner, resolve_provider_models
 from app.cli.interactive_shell.command_registry.types import ExecutionTier, SlashCommand
 from app.cli.interactive_shell.rendering import repl_table
 from app.cli.interactive_shell.repl_choice_menu import (
@@ -20,6 +20,7 @@ from app.cli.interactive_shell.session import ReplSession
 from app.cli.interactive_shell.theme import BOLD_BRAND, DIM, ERROR, HIGHLIGHT, WARNING
 from app.llm_reasoning_effort import (
     REASONING_EFFORT_OPTIONS,
+    describe_reasoning_effort_default,
     display_reasoning_effort,
     parse_reasoning_effort,
     provider_supports_reasoning_effort,
@@ -116,11 +117,18 @@ def _cmd_cost(session: ReplSession, console: Console, _args: list[str]) -> bool:
 def _cmd_effort(session: ReplSession, console: Console, args: list[str]) -> bool:
     settings = repl_data.load_llm_settings()
     provider = str(getattr(settings, "provider", os.getenv("LLM_PROVIDER", "anthropic")))
+    reasoning_model = ""
+    if settings is not None:
+        reasoning_model, _toolcall_model = resolve_provider_models(settings, provider)
     supported_values = ", ".join(REASONING_EFFORT_OPTIONS)
 
     if not args:
         console.print(
             f"[{HIGHLIGHT}]reasoning effort:[/] {display_reasoning_effort(session.reasoning_effort)}"
+        )
+        console.print(
+            f"[{DIM}]default config:[/] "
+            f"{escape(describe_reasoning_effort_default(provider, reasoning_model))}"
         )
         console.print(f"[{DIM}]usage:[/] /effort <{supported_values}>")
         if not provider_supports_reasoning_effort(provider):

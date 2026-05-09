@@ -129,7 +129,7 @@ Configure once, then pick how you want to run investigations:
 opensre onboard
 ```
 
-**Interactive shell** — with no subcommand, `opensre` starts a REPL (TTY required). Describe incidents in plain language, stream investigations, and use slash commands such as `/help`, `/status`, `/clear`, `/reset`, `/trust`, `/exit`. Ctrl+C cancels an in-flight investigation without losing session state.
+**Interactive shell** — with no subcommand, `opensre` starts a REPL (TTY required). Describe incidents in plain language, stream investigations, and use slash commands such as `/help`, `/status`, `/clear`, `/reset`, `/trust`, `/effort`, `/exit`. `/effort` sets reasoning depth for **OpenAI** and **Codex** providers (`low`, `medium`, `high`, `xhigh`, or `max`; other providers ignore it). Ctrl+C cancels an in-flight investigation without losing session state.
 
 ```bash
 opensre

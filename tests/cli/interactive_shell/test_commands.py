@@ -88,6 +88,24 @@ class TestDispatchSlash:
         assert session.reasoning_effort is None
         assert "unknown reasoning effort" in buf.getvalue()
 
+    def test_effort_shows_default_config_when_unset(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        class _FakeLLM:
+            provider = "anthropic"
+            anthropic_reasoning_model = "claude-opus-4-7"
+            anthropic_toolcall_model = "claude-haiku-4-5-20251001"
+
+        monkeypatch.setattr(repl_data_module, "load_llm_settings", lambda: _FakeLLM())
+        session = ReplSession()
+        console, buf = _capture()
+
+        dispatch_slash("/effort", session, console)
+
+        output = buf.getvalue()
+        assert "reasoning effort:" in output
+        assert "(default)" in output
+        assert "default config:" in output
+        assert "anthropic does not use reasoning-effort overrides" in output
+
     def test_reset_clears_session(self) -> None:
         session = ReplSession()
         session.record("alert", "test")
