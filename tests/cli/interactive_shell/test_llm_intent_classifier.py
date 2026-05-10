@@ -432,9 +432,7 @@ class TestRegexFallbackRouting:
         assert route_input("why?", session).route_kind == RouteKind.FOLLOW_UP
         assert route_input("what caused it?", session).route_kind == RouteKind.FOLLOW_UP
 
-    def test_prior_state_new_alert_still_routes_correctly(
-        self, _disable_llm_routing: None
-    ) -> None:
+    def test_prior_state_new_alert_still_routes_correctly(self, _disable_llm_routing: None) -> None:
         session = _fresh_session(with_prior_state=True)
         assert route_input("CPU spiked on orders-api", session).route_kind == RouteKind.NEW_ALERT
 
@@ -554,9 +552,7 @@ class TestLLMRoutingDisabledFlag:
             route_input("run synthetic test 002-connection-exhaustion", session)
         mock_llm.assert_not_called()
 
-    def test_llm_not_called_for_any_input_when_disabled(
-        self, _disable_llm_routing: None
-    ) -> None:
+    def test_llm_not_called_for_any_input_when_disabled(self, _disable_llm_routing: None) -> None:
         session = _fresh_session()
         with patch(
             "app.cli.interactive_shell.llm_intent_classifier.classify_intent_with_llm"
